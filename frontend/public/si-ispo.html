@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -9809,5 +9810,505 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script>
+/* ================================================================
+   SI-ISPO EXTENSIONS — Pemetaan Lahan + Traceability Produk
+   ================================================================ */
+(function(){
+  const API = (location.origin) + '/api';
+
+  /* ── Inject new nav items into roles that need them ── */
+  function injectNav(){
+    if (typeof ROLES === 'undefined') return;
+    const lahanItem = {id:'pemetaan-lahan', label:'Pemetaan Lahan', icon:'🗺️'};
+    const traceItem = {id:'produk-trace',   label:'Produk & Traceability', icon:'🔗'};
+    const targets = {
+      ls:           [lahanItem, traceItem],
+      pekebun:      [lahanItem, traceItem],
+      pks:          [lahanItem, traceItem],
+      perkebunan:   [lahanItem, traceItem],
+      bioenergy:    [traceItem],
+      buyer:        [traceItem],
+      auditor:      [lahanItem],
+      auditor_int:  [lahanItem],
+    };
+    Object.keys(targets).forEach(role => {
+      if (!ROLES[role]) return;
+      const existing = ROLES[role].nav.map(n => n.id);
+      targets[role].forEach(it => {
+        if (!existing.includes(it.id)) {
+          // insert near top (after dashboard)
+          const idx = ROLES[role].nav.findIndex(n => n.id === 'dashboard');
+          ROLES[role].nav.splice(idx + 1, 0, it);
+        }
+      });
+    });
+  }
+
+  /* ── Toast helper that falls back to alert ── */
+  function notify(msg){ try{ toast(msg); } catch(e){ console.log(msg); } }
+
+  /* ── State ── */
+  const State = { plots: [], products: [], mapInstance: null, drawnLayer: null, editingPlotId: null };
+
+  /* ── Fetch helpers ── */
+  async function api(path, opts){
+    const r = await fetch(API + path, opts);
+    if (!r.ok) throw new Error('API ' + path + ' -> ' + r.status);
+    return r.json();
+  }
+  async function loadPlots(){ State.plots = await api('/plots'); }
+  async function loadProducts(){ State.products = await api('/products'); }
+
+  /* ── Status color helper ── */
+  function statusColor(s){
+    if (s==='Tersertifikasi') return '#16A34A';
+    if (s==='Proses') return '#D97706';
+    if (s==='Suspend') return '#DC2626';
+    return '#6B7280';
+  }
+  function statusBadge(s){
+    if (s==='Tersertifikasi') return 'b-g';
+    if (s==='Proses') return 'b-a';
+    if (s==='Suspend') return 'b-r';
+    return 'b-gr';
+  }
+
+  /* ================================================================
+     PEMETAAN LAHAN  (live polygon map + doc upload)
+     ================================================================ */
+  window.rPemetaanLahan = function(pg, tl){
+    tl.textContent = '🗺️ Pemetaan Lahan';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🗺️ Pemetaan & Pengawasan Lahan Sawit</h1>
+        <p>Pengawasan lahan kelapa sawit secara real-time dengan data polygon. Klik area lahan untuk melihat detail & dokumen pembuktian.</p>
+      </div>
+      <div class="stats-row" id="lahan-stats"></div>
+      <div style="display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start" id="lahan-grid">
+        <div class="card" style="padding:12px;position:relative">
+          <div class="card-title" style="margin-bottom:10px">
+            <span>🌍 Peta Live Polygon Lahan</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-out btn-sm" id="btn-draw-plot" data-testid="btn-draw-plot">✏️ Tambah Polygon</button>
+              <button class="btn btn-ghost btn-sm" id="btn-refresh-map" data-testid="btn-refresh-map">↻ Refresh</button>
+            </div>
+          </div>
+          <div id="lahan-map" style="width:100%;height:560px;border-radius:10px;border:1px solid var(--bd);overflow:hidden"></div>
+          <div style="font-size:11px;color:var(--t3);margin-top:8px">Layer dasar: OpenStreetMap. Warna polygon mencerminkan status ISPO.</div>
+        </div>
+        <div id="lahan-side"></div>
+      </div>
+    `;
+
+    renderLahanStats();
+    renderLahanSide(null);
+
+    // Init map
+    setTimeout(()=>initLahanMap(), 50);
+
+    document.getElementById('btn-refresh-map').onclick = async()=>{
+      notify('🔄 Memuat ulang data lahan...');
+      await loadPlots(); initLahanMap(); renderLahanStats(); renderLahanSide(null);
+    };
+    document.getElementById('btn-draw-plot').onclick = ()=> startDrawPolygon();
+  };
+
+  function renderLahanStats(){
+    const total = State.plots.length;
+    const tersert = State.plots.filter(p=>p.status_ispo==='Tersertifikasi').length;
+    const proses  = State.plots.filter(p=>p.status_ispo==='Proses').length;
+    const blm     = State.plots.filter(p=>p.status_ispo==='Belum Sertifikasi').length;
+    const luas    = State.plots.reduce((s,p)=>s+(p.luas_ha||0),0);
+    const el = document.getElementById('lahan-stats');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">🌴</div><div class="sc-label">Total Lahan</div><div class="sc-val" data-testid="stat-total">${total}</div><div class="sc-change">${luas.toLocaleString('id-ID')} ha total</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">🏆</div><div class="sc-label">Tersertifikasi</div><div class="sc-val" data-testid="stat-tersert">${tersert}</div><div class="sc-change sc-up">${total?Math.round(tersert/total*100):0}% dari total</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:var(--al);color:var(--a)">⏳</div><div class="sc-label">Proses Audit</div><div class="sc-val" data-testid="stat-proses">${proses}</div><div class="sc-change">Dalam tahap sertifikasi</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:#F3F4F6;color:#6B7280">📋</div><div class="sc-label">Belum Sertifikasi</div><div class="sc-val" data-testid="stat-belum">${blm}</div><div class="sc-change">Perlu pendampingan</div></div>
+    `;
+  }
+
+  function renderLahanSide(plot){
+    const side = document.getElementById('lahan-side');
+    if (!side) return;
+    if (!plot) {
+      // list
+      side.innerHTML = `
+        <div class="card" style="padding:14px">
+          <div class="card-title">📋 Daftar Lahan</div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:560px;overflow-y:auto" data-testid="plot-list">
+            ${State.plots.map(p=>`
+              <div class="lahan-row" data-id="${p.id}" style="border:1px solid var(--bd);border-radius:9px;padding:10px;cursor:pointer;background:#fff;transition:.15s">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+                  <div style="font-weight:700;font-size:13px;color:var(--t1)">${p.nama}</div>
+                  <span class="badge ${statusBadge(p.status_ispo)}">${p.status_ispo}</span>
+                </div>
+                <div style="font-size:11.5px;color:var(--t2);margin-top:3px">🏢 ${p.pemilik}</div>
+                <div style="font-size:11.5px;color:var(--t3);margin-top:2px">📍 ${p.provinsi}${p.kabupaten?', '+p.kabupaten:''} • ${p.luas_ha} ha</div>
+                <div style="font-size:11px;color:var(--t3);margin-top:3px">📄 ${(p.documents||[]).length} dokumen pembuktian</div>
+              </div>
+            `).join('') || '<div style="text-align:center;padding:18px;color:var(--t3);font-size:12px">Belum ada data lahan. Klik tombol "Tambah Polygon" di peta untuk menambah.</div>'}
+          </div>
+        </div>
+      `;
+      side.querySelectorAll('.lahan-row').forEach(r=>{
+        r.onclick = ()=>{
+          const id = r.dataset.id;
+          const plot = State.plots.find(x=>x.id===id);
+          renderLahanSide(plot);
+          flyToPlot(plot);
+        };
+        r.onmouseenter = ()=> r.style.background = 'var(--gl)';
+        r.onmouseleave = ()=> r.style.background = '#fff';
+      });
+      return;
+    }
+    // detail panel
+    side.innerHTML = `
+      <div class="card" style="padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:8px">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:var(--t1)">${plot.nama}</div>
+            <div style="font-size:11.5px;color:var(--t2);margin-top:2px">${plot.pemilik}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="back-list" data-testid="btn-back-list">← Daftar</button>
+        </div>
+        <div style="margin-bottom:10px"><span class="badge ${statusBadge(plot.status_ispo)}">${plot.status_ispo}</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;font-size:12px">
+          <div><div style="color:var(--t3);font-size:11px">Provinsi</div><div style="color:var(--t1);font-weight:600">${plot.provinsi}</div></div>
+          <div><div style="color:var(--t3);font-size:11px">Kabupaten</div><div style="color:var(--t1);font-weight:600">${plot.kabupaten||'-'}</div></div>
+          <div><div style="color:var(--t3);font-size:11px">Luas</div><div style="color:var(--t1);font-weight:600">${plot.luas_ha} ha</div></div>
+          <div><div style="color:var(--t3);font-size:11px">Tahun Tanam</div><div style="color:var(--t1);font-weight:600">${plot.tahun_tanam||'-'}</div></div>
+        </div>
+        ${plot.catatan ? `<div style="background:var(--gl);padding:8px 10px;border-radius:7px;font-size:12px;color:var(--t2);margin-bottom:12px">💬 ${plot.catatan}</div>`: ''}
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:var(--t1)">📄 Dokumen Pembuktian (${(plot.documents||[]).length})</div>
+          <label class="btn btn-g btn-sm" style="cursor:pointer" data-testid="btn-upload-doc">
+            <input type="file" id="doc-upload" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.webp"> 📤 Upload
+          </label>
+        </div>
+        <div id="doc-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">
+          ${(plot.documents||[]).map(d=>`
+            <div style="border:1px solid var(--bd);border-radius:7px;padding:7px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;font-size:12px">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📎 ${d.label||d.filename}</div>
+                <div style="font-size:10.5px;color:var(--t3)">${(d.size/1024).toFixed(1)} KB • ${new Date(d.uploaded_at).toLocaleDateString('id-ID')}</div>
+              </div>
+              <a class="btn btn-out btn-sm" href="${API}/files/${d.storage_path}" target="_blank">👁</a>
+            </div>
+          `).join('') || '<div style="text-align:center;font-size:11.5px;color:var(--t3);padding:14px">Belum ada dokumen. Upload sertifikat lahan, foto drone, atau bukti lainnya.</div>'}
+        </div>
+      </div>
+    `;
+    document.getElementById('back-list').onclick = ()=> renderLahanSide(null);
+    const fileEl = document.getElementById('doc-upload');
+    fileEl.onchange = async()=>{
+      if (!fileEl.files.length) return;
+      const file = fileEl.files[0];
+      const label = prompt('Label dokumen (mis. Sertifikat Lahan, Foto Drone):', file.name) || file.name;
+      const fd = new FormData(); fd.append('file', file); fd.append('label', label);
+      notify('⬆️ Mengupload dokumen...');
+      try{
+        const r = await fetch(`${API}/plots/${plot.id}/documents`, {method:'POST', body:fd});
+        if (!r.ok) throw new Error('upload failed');
+        notify('✅ Dokumen berhasil diupload');
+        await loadPlots();
+        const updated = State.plots.find(x=>x.id===plot.id);
+        renderLahanSide(updated);
+      } catch(e){
+        notify('❌ Upload gagal: '+e.message);
+      }
+    };
+  }
+
+  /* ── Leaflet map init ── */
+  function initLahanMap(){
+    const el = document.getElementById('lahan-map');
+    if (!el) return;
+    if (State.mapInstance){ State.mapInstance.remove(); State.mapInstance = null; }
+    const map = L.map(el).setView([-1.0, 113.0], 5);
+    State.mapInstance = map;
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 18
+    }).addTo(map);
+
+    const layerGroup = L.featureGroup().addTo(map);
+    State.drawnLayer = layerGroup;
+
+    State.plots.forEach(p=>{
+      if (!p.polygon || p.polygon.length < 3) return;
+      const color = statusColor(p.status_ispo);
+      const poly = L.polygon(p.polygon, {color, fillColor:color, fillOpacity:.35, weight:2}).addTo(layerGroup);
+      poly.bindTooltip(`<b>${p.nama}</b><br>${p.luas_ha} ha • ${p.status_ispo}`, {sticky:true});
+      poly.on('click', ()=>{ renderLahanSide(p); });
+    });
+
+    if (State.plots.length) {
+      const bounds = layerGroup.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, {padding:[30,30]});
+    }
+  }
+
+  function flyToPlot(p){
+    if (!State.mapInstance || !p.centroid) return;
+    State.mapInstance.flyTo(p.centroid, 11, {duration:.8});
+  }
+
+  /* ── Polygon drawing for new plot ── */
+  function startDrawPolygon(){
+    if (!State.mapInstance){ notify('⚠️ Peta belum siap'); return; }
+    notify('✏️ Klik di peta untuk menggambar polygon. Klik titik awal lagi untuk selesai.');
+    const drawer = new L.Draw.Polygon(State.mapInstance, {
+      shapeOptions:{color:'#D84900', fillColor:'#D84900', fillOpacity:.3, weight:2}
+    });
+    drawer.enable();
+    const onCreated = async (e)=>{
+      State.mapInstance.off(L.Draw.Event.CREATED, onCreated);
+      const layer = e.layer;
+      State.drawnLayer.addLayer(layer);
+      const latlngs = layer.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
+      // simple centroid
+      const cx = latlngs.reduce((s,p)=>s+p[0],0)/latlngs.length;
+      const cy = latlngs.reduce((s,p)=>s+p[1],0)/latlngs.length;
+      const nama = prompt('Nama lahan baru:', 'Kebun Baru');
+      if (!nama){ State.drawnLayer.removeLayer(layer); return; }
+      const pemilik = prompt('Nama pemilik:', '') || '-';
+      const provinsi = prompt('Provinsi:', 'Riau') || '-';
+      const luas = parseFloat(prompt('Estimasi luas (ha):', '100') || '0');
+      try{
+        const created = await api('/plots', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            nama, pemilik, provinsi, luas_ha: luas,
+            status_ispo: 'Belum Sertifikasi',
+            polygon: latlngs, centroid: [cx, cy]
+          })
+        });
+        notify('✅ Lahan tersimpan: ' + created.nama);
+        await loadPlots(); initLahanMap(); renderLahanStats(); renderLahanSide(created);
+      } catch(err){
+        notify('❌ Gagal menyimpan: '+err.message);
+      }
+    };
+    State.mapInstance.on(L.Draw.Event.CREATED, onCreated);
+  }
+
+  /* ================================================================
+     PRODUK & TRACEABILITY
+     ================================================================ */
+  const KAT_COLORS = {
+    'Hulu': {bg:'#FEF3C7', fg:'#92400E', ic:'🌴'},
+    'Rafinasi': {bg:'#DBEAFE', fg:'#1E40AF', ic:'🛢️'},
+    'Pangan': {bg:'#FCE7F3', fg:'#9D174D', ic:'🍳'},
+    'Oleokimia': {bg:'#E0E7FF', fg:'#3730A3', ic:'🧪'},
+    'Bioenergi': {bg:'#D1FAE5', fg:'#065F46', ic:'⚡'},
+  };
+
+  window.rProdukTrace = function(pg, tl){
+    tl.textContent = '🔗 Produk & Traceability';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🔗 Produk ISPO & Traceability Hulu-Hilir</h1>
+        <p>Telusuri produk turunan sawit dari hilir (biodiesel, sabun, margarin) sampai asal-usul TBS & lahan kebunnya.</p>
+      </div>
+      <div class="stats-row" id="prod-stats"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="padding:14px">
+          <div class="card-title">🎯 Filter Kategori</div>
+          <div id="kat-filter" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div class="card" style="padding:14px">
+          <div class="card-title">🔍 Cari Produk</div>
+          <input class="inp" id="prod-search" placeholder="Cari nama produk, kode, atau produsen..." data-testid="prod-search"/>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="card-title" style="padding:14px 16px;margin:0;border-bottom:1px solid var(--bd)">📦 Daftar Produk (<span id="prod-count">0</span>)</div>
+        <div class="tbl-wrap" style="border:none;border-radius:0">
+          <table class="tbl" data-testid="prod-table">
+            <thead><tr>
+              <th>Kode</th><th>Produk</th><th>Kategori</th><th>Produsen</th><th>Jumlah</th><th>Batch</th><th>Trace</th>
+            </tr></thead>
+            <tbody id="prod-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    renderProdStats();
+    renderKatFilter();
+    renderProdTable();
+
+    document.getElementById('prod-search').oninput = (e)=> renderProdTable(window.__activeKat, e.target.value);
+  };
+
+  function renderProdStats(){
+    const total = State.products.length;
+    const cats = {};
+    State.products.forEach(p => cats[p.kategori] = (cats[p.kategori]||0)+1);
+    const el = document.getElementById('prod-stats');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">📦</div><div class="sc-label">Total Produk</div><div class="sc-val">${total}</div><div class="sc-change">Semua kategori</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:#FEF3C7;color:#92400E">🌴</div><div class="sc-label">Hulu (TBS/CPO)</div><div class="sc-val">${(cats['Hulu']||0)+(cats['Rafinasi']||0)}</div><div class="sc-change">Bahan baku & rafinasi</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:#FCE7F3;color:#9D174D">🍳</div><div class="sc-label">Pangan</div><div class="sc-val">${cats['Pangan']||0}</div><div class="sc-change">Minyak goreng, margarin</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:#E0E7FF;color:#3730A3">🧪</div><div class="sc-label">Oleokimia</div><div class="sc-val">${cats['Oleokimia']||0}</div><div class="sc-change">Sabun, kosmetik</div></div>
+      <div class="stat-card"><div class="sc-icon" style="background:#D1FAE5;color:#065F46">⚡</div><div class="sc-label">Bioenergi</div><div class="sc-val">${cats['Bioenergi']||0}</div><div class="sc-change">Biodiesel, biogas</div></div>
+    `;
+  }
+
+  function renderKatFilter(){
+    const el = document.getElementById('kat-filter');
+    if (!el) return;
+    const kats = ['Semua','Hulu','Rafinasi','Pangan','Oleokimia','Bioenergi'];
+    el.innerHTML = kats.map(k => `<button class="btn ${k==='Semua'?'btn-g':'btn-ghost'} btn-sm kat-btn" data-k="${k}" data-testid="kat-${k.toLowerCase()}">${k==='Semua'?'🌐':(KAT_COLORS[k]?.ic||'')} ${k}</button>`).join('');
+    el.querySelectorAll('.kat-btn').forEach(b=>{
+      b.onclick = ()=>{
+        el.querySelectorAll('.kat-btn').forEach(x=>{x.classList.remove('btn-g'); x.classList.add('btn-ghost');});
+        b.classList.add('btn-g'); b.classList.remove('btn-ghost');
+        const k = b.dataset.k;
+        window.__activeKat = (k==='Semua' ? null : k);
+        renderProdTable(window.__activeKat, document.getElementById('prod-search').value);
+      };
+    });
+  }
+
+  function renderProdTable(kat, q){
+    const tbody = document.getElementById('prod-tbody'); if (!tbody) return;
+    let list = State.products;
+    if (kat) list = list.filter(p => p.kategori===kat);
+    if (q){
+      const s = q.toLowerCase();
+      list = list.filter(p => (p.nama+p.kode+p.produsen+p.jenis).toLowerCase().includes(s));
+    }
+    document.getElementById('prod-count').textContent = list.length;
+    tbody.innerHTML = list.map(p=>{
+      const c = KAT_COLORS[p.kategori] || {bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+      return `<tr>
+        <td><div class="cn" style="font-family:monospace">${p.kode}</div></td>
+        <td><div class="cn">${p.nama}</div><div class="cs">${p.jenis}</div></td>
+        <td><span class="badge" style="background:${c.bg};color:${c.fg}">${c.ic} ${p.kategori}</span></td>
+        <td>${p.produsen}</td>
+        <td>${p.jumlah.toLocaleString('id-ID')} ${p.satuan}</td>
+        <td>${p.batch_date||'-'}</td>
+        <td><button class="btn btn-out btn-sm" data-trace="${p.id}" data-testid="btn-trace-${p.kode}">🔍 Telusuri</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--t3)">Tidak ada produk</td></tr>';
+    tbody.querySelectorAll('[data-trace]').forEach(b=>{
+      b.onclick = ()=> showTraceModal(b.dataset.trace);
+    });
+  }
+
+  async function showTraceModal(productId){
+    notify('🔍 Memuat rantai traceability...');
+    let tree;
+    try{ tree = await api(`/products/${productId}/trace`); }
+    catch(e){ notify('❌ Gagal memuat: '+e.message); return; }
+
+    const ov = document.createElement('div');
+    ov.id = 'trace-modal-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:1000px;width:100%;max-height:92vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4)" data-testid="trace-modal">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,var(--g),var(--gd));color:#fff">
+          <div>
+            <div style="font-size:17px;font-weight:800">🔗 Traceability — ${tree.nama}</div>
+            <div style="font-size:12px;opacity:.85;margin-top:2px">Telusuri rantai pasok dari produk ini sampai ke kebun asal</div>
+          </div>
+          <button id="close-trace" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px" data-testid="close-trace">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:22px;background:var(--gl)">
+          <div id="trace-tree"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    document.getElementById('close-trace').onclick = ()=> ov.remove();
+    ov.onclick = (e)=>{ if (e.target===ov) ov.remove(); };
+    renderTraceTree(tree, document.getElementById('trace-tree'));
+  }
+
+  function renderTraceTree(node, container, depth){
+    depth = depth || 0;
+    const c = KAT_COLORS[node.kategori] || {bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+    const card = document.createElement('div');
+    card.style.cssText = `position:relative;margin-left:${depth*32}px;margin-bottom:14px`;
+    if (depth>0){
+      card.innerHTML = `<div style="position:absolute;left:-18px;top:18px;width:14px;height:2px;background:var(--gm)"></div>`;
+    }
+    const plotInfo = node.plot ? `
+      <div style="background:var(--gs);border:1px solid var(--gbd);padding:10px 12px;border-radius:8px;margin-top:10px">
+        <div style="font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🗺️ Asal-Usul Hulu</div>
+        <div style="font-size:13px;font-weight:700;color:var(--t1)">${node.plot.nama}</div>
+        <div style="font-size:11.5px;color:var(--t2);margin-top:2px">🏢 ${node.plot.pemilik} • 📍 ${node.plot.provinsi}${node.plot.kabupaten?', '+node.plot.kabupaten:''}</div>
+        <div style="font-size:11.5px;color:var(--t2);margin-top:2px">📐 ${node.plot.luas_ha} ha • <span class="badge ${statusBadge(node.plot.status_ispo)}">${node.plot.status_ispo}</span></div>
+      </div>` : '';
+
+    card.innerHTML += `
+      <div style="background:#fff;border:1.5px solid ${c.fg};border-left-width:5px;border-radius:10px;padding:13px 16px;box-shadow:var(--shadow)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span class="badge" style="background:${c.bg};color:${c.fg};font-size:10.5px">${c.ic} ${node.kategori}</span>
+              <span style="font-family:monospace;font-size:11px;color:var(--t3)">${node.kode}</span>
+            </div>
+            <div style="font-size:14px;font-weight:700;color:var(--t1)">${node.nama}</div>
+            <div style="font-size:11.5px;color:var(--t2);margin-top:2px">${node.jenis}</div>
+            <div style="font-size:11.5px;color:var(--t3);margin-top:4px">🏢 ${node.produsen} • 📦 ${node.jumlah.toLocaleString('id-ID')} ${node.satuan}${node.batch_date?' • 📅 '+node.batch_date:''}</div>
+          </div>
+        </div>
+        ${plotInfo}
+      </div>
+    `;
+    container.appendChild(card);
+    (node.parents||[]).forEach(p => renderTraceTree(p, container, depth+1));
+  }
+
+  /* ================================================================
+     PATCH renderPage to handle new pages
+     ================================================================ */
+  function patchRenderPage(){
+    if (typeof renderPage !== 'function') return;
+    const original = renderPage;
+    window.renderPage = function(page){
+      if (page === 'pemetaan-lahan'){
+        const pg=document.getElementById('main-page'),tl=document.getElementById('tb-title');
+        loadPlots().then(()=> window.rPemetaanLahan(pg, tl)).catch(e=>{
+          pg.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px">⚠️</div><div>Gagal memuat data lahan: '+e.message+'</div></div>';
+        });
+        return;
+      }
+      if (page === 'produk-trace'){
+        const pg=document.getElementById('main-page'),tl=document.getElementById('tb-title');
+        loadProducts().then(()=> window.rProdukTrace(pg, tl)).catch(e=>{
+          pg.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px">⚠️</div><div>Gagal memuat produk: '+e.message+'</div></div>';
+        });
+        return;
+      }
+      return original(page);
+    };
+  }
+
+  /* ── Init ── */
+  function init(){
+    injectNav();
+    patchRenderPage();
+    // Prefetch data
+    loadPlots().catch(()=>{});
+    loadProducts().catch(()=>{});
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    // Need to wait until ROLES & renderPage are defined; they are in the inline script above
+    setTimeout(init, 100);
+  }
+})();
+</script>
 </body>
 </html>

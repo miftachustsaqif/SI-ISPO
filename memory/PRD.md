@@ -33,3 +33,22 @@ User uploaded an HTML mockup file (`180526_SI-ISPO SCI.html`, ~856KB, ~10K lines
 - P2: Add file upload for sertifikat documents (object storage)
 - P2: Add reporting/export (PDF, Excel)
 - P2: Real-time notifications via WebSocket
+
+## Update — 2026-05-25
+### Added Features
+- **Pemetaan Lahan** (`pemetaan-lahan` page): Live Leaflet polygon map with OpenStreetMap, color-coded by ISPO status. Click polygon → detail panel. Draw new polygon via leaflet-draw, save to backend.
+- **Document upload per plot**: Object storage integration (Emergent obj store), upload PDF/JPG/PNG evidence files (sertifikat lahan, foto drone, surat tanah) attached to each land plot.
+- **Produk & Traceability** (`produk-trace` page): Full product catalog across 5 categories (Hulu/Rafinasi/Pangan/Oleokimia/Bioenergi) with kategori filter & search.
+- **Traceability tree modal**: Recursive upstream chain from any product down to TBS source + origin plot (with land details: pemilik, luas, status ISPO).
+- **Seeded demo data**: 5 plots (Riau, Sumut, Kalbar, Aceh, Jambi) + 22 products covering the full chain TBS → CPO/PKO → RBD → Olein/Stearin → Minyak Goreng/Margarin/Specialty Fats/Pakan + Fatty Acid → Sabun/Kosmetik + Metil Ester → Biodiesel + Biomassa + Biogas.
+
+### New Backend Endpoints
+- `GET/POST/PUT/DELETE /api/plots`, `GET /api/plots/{id}`
+- `POST /api/plots/{id}/documents` (multipart upload → object storage)
+- `GET /api/files/{path:path}` (serve from object storage)
+- `GET/POST /api/products`, `GET /api/products/{id}`
+- `GET /api/products/{id}/trace` (recursive parent chain → origin plot)
+- `POST /api/seed`
+
+### Implementation Note
+New features are **injected** into the existing mockup HTML via a single appended `<script>` block (does not break original mockup). New nav items added to: LS, Pekebun, PKS, Perkebunan, Bioenergi, Buyer, Auditor roles.
