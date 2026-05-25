@@ -9821,6 +9821,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   /* ── Inject new nav items into roles that need them ── */
   function injectNav(){
     if (typeof ROLES === 'undefined') return;
+    // Add the Super Admin role itself
+    if (!ROLES.superadmin) {
+      ROLES.superadmin = {
+        name: 'Super Admin SI-ISPO',
+        role: 'Super Administrator',
+        av: 'S',
+        nav: [
+          {id:'dashboard',         label:'Dashboard Admin',      icon:'🛡️'},
+          {id:'admin-users',       label:'Manajemen User & Role', icon:'👥'},
+          {id:'pemetaan-lahan',    label:'Pemetaan Lahan',        icon:'🗺️'},
+          {id:'produk-trace',      label:'Produk & Traceability', icon:'🔗'},
+          {id:'admin-certificates',label:'Semua Sertifikat',      icon:'🏆'},
+          {id:'admin-audits',      label:'Semua Audit',           icon:'🔍'},
+          {id:'admin-companies',   label:'Semua Perusahaan',      icon:'🏢'},
+          {id:'notifikasi',        label:'Notifikasi Sistem',     icon:'🔔'},
+          {id:'pengaturan',        label:'Pengaturan Sistem',     icon:'⚙️'},
+        ]
+      };
+    }
     const lahanItem = {id:'pemetaan-lahan', label:'Pemetaan Lahan', icon:'🗺️'};
     const traceItem = {id:'produk-trace',   label:'Produk & Traceability', icon:'🔗'};
     const targets = {
@@ -9838,11 +9857,30 @@ document.addEventListener('DOMContentLoaded',()=>{
       const existing = ROLES[role].nav.map(n => n.id);
       targets[role].forEach(it => {
         if (!existing.includes(it.id)) {
-          // insert near top (after dashboard)
           const idx = ROLES[role].nav.findIndex(n => n.id === 'dashboard');
           ROLES[role].nav.splice(idx + 1, 0, it);
         }
       });
+    });
+  }
+
+  /* ── Inject Super Admin demo login button ── */
+  function injectAdminLoginBtn(){
+    const demoPanels = document.querySelectorAll('#login-form .btn.btn-om.btn-sm');
+    demoPanels.forEach(b => {
+      if (b.previousElementSibling && b.previousElementSibling.tagName === 'DIV') {
+        const grid = b.previousElementSibling;
+        if (!grid.querySelector('[data-role="superadmin"]')) {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-sm';
+          btn.setAttribute('data-role','superadmin');
+          btn.setAttribute('data-testid','demo-superadmin');
+          btn.style.cssText = 'justify-content:flex-start;gap:6px;background:linear-gradient(135deg,#1A5C1A,#D84900);color:#fff;border:none;grid-column:span 2';
+          btn.innerHTML = '🛡️ Super Admin (Lihat & Atur Semua)';
+          btn.onclick = ()=> loginAs('superadmin');
+          grid.appendChild(btn);
+        }
+      }
     });
   }
 
@@ -10269,21 +10307,378 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   /* ================================================================
+     SUPER ADMIN — Dashboard Overview, User Management, Read-only views
+     ================================================================ */
+  const ROLE_LABELS = {
+    superadmin:{label:'Super Admin', ic:'🛡️', cls:'b-p'},
+    ls:{label:'Lembaga Sertifikasi', ic:'🏛️', cls:'b-b'},
+    pekebun:{label:'Pekebun', ic:'🌿', cls:'b-g'},
+    pks:{label:'PKS / Hilir', ic:'🏭', cls:'b-a'},
+    buyer:{label:'Buyer', ic:'🛒', cls:'b-c'},
+    auditor:{label:'Auditor Eksternal', ic:'🔍', cls:'b-t'},
+    auditor_int:{label:'Auditor Internal', ic:'🔎', cls:'b-t'},
+    reviewer:{label:'Reviewer LS', ic:'📋', cls:'b-b'},
+    perkebunan:{label:'Perusahaan Perkebunan', ic:'🌴', cls:'b-g'},
+    bioenergy:{label:'Bioenergi', ic:'⚡', cls:'b-a'},
+  };
+
+  window.rAdminDashboard = async function(pg, tl){
+    tl.textContent = '🛡️ Dashboard Super Admin';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🛡️ Dashboard Super Admin SI-ISPO</h1>
+        <p>Pantau seluruh sistem: pengguna, lahan, sertifikat, produk, dan dokumen secara real-time.</p>
+      </div>
+      <div id="admin-loading" style="text-align:center;padding:40px;color:var(--t3)">⏳ Memuat data...</div>
+      <div id="admin-content" style="display:none"></div>
+    `;
+    let o;
+    try{ o = await api('/admin/overview'); }
+    catch(e){ document.getElementById('admin-loading').textContent = '❌ Gagal memuat: '+e.message; return; }
+    document.getElementById('admin-loading').style.display='none';
+    const c = document.getElementById('admin-content');
+    c.style.display='block';
+
+    const byRole = o.users.by_role || {};
+    const byKat  = o.products.by_kategori || {};
+
+    c.innerHTML = `
+      <div class="stats-row" data-testid="admin-stats">
+        <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">👥</div><div class="sc-label">Total Pengguna</div><div class="sc-val">${o.users.total}</div><div class="sc-change sc-up">${o.users.active} aktif • ${o.users.suspended} suspend</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:#FEF3C7;color:#92400E">🌴</div><div class="sc-label">Total Lahan</div><div class="sc-val">${o.plots.total}</div><div class="sc-change">${o.plots.luas_total_ha.toLocaleString('id-ID')} ha total</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">🏆</div><div class="sc-label">Lahan Tersertifikasi</div><div class="sc-val">${o.plots.tersertifikasi}</div><div class="sc-change sc-up">${o.plots.total?Math.round(o.plots.tersertifikasi/o.plots.total*100):0}% dari total</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:#DBEAFE;color:#1E40AF">📦</div><div class="sc-label">Total Produk</div><div class="sc-val">${o.products.total}</div><div class="sc-change">${Object.keys(byKat).length} kategori</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:var(--al);color:var(--a)">📄</div><div class="sc-label">Dokumen</div><div class="sc-val">${o.documents}</div><div class="sc-change">Tersimpan di Object Storage</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">👥 Distribusi Pengguna per Role</div>
+          <div style="display:flex;flex-direction:column;gap:8px" data-testid="role-distribution">
+            ${Object.entries(byRole).sort((a,b)=>b[1]-a[1]).map(([role,n])=>{
+              const rl = ROLE_LABELS[role]||{label:role,ic:'•'};
+              const pct = o.users.total ? Math.round(n/o.users.total*100) : 0;
+              return `<div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <div style="font-size:12.5px;color:var(--t1);font-weight:600">${rl.ic} ${rl.label}</div>
+                  <div style="font-size:12px;color:var(--t2);font-weight:700">${n} <span style="color:var(--t3);font-weight:400">(${pct}%)</span></div>
+                </div>
+                <div class="prog-bar" style="min-width:auto"><div class="prog-fill" style="width:${pct}%"></div></div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Distribusi Produk per Kategori</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            ${Object.entries(byKat).sort((a,b)=>b[1]-a[1]).map(([k,n])=>{
+              const kc = KAT_COLORS[k]||{bg:'#F3F4F6',fg:'#374151',ic:'•'};
+              const pct = o.products.total ? Math.round(n/o.products.total*100) : 0;
+              return `<div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                  <div style="font-size:12.5px;color:var(--t1);font-weight:600">${kc.ic} ${k}</div>
+                  <div style="font-size:12px;color:var(--t2);font-weight:700">${n} <span style="color:var(--t3);font-weight:400">(${pct}%)</span></div>
+                </div>
+                <div class="prog-bar" style="min-width:auto;background:${kc.bg}"><div class="prog-fill" style="width:${pct}%;background:${kc.fg}"></div></div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+        <div class="card" style="cursor:pointer" onclick="nav('admin-users')" data-testid="card-users">
+          <div style="font-size:28px;margin-bottom:6px">👥</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1)">Kelola User & Role</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:3px">Tambah, ubah role, suspend akun</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="nav('pemetaan-lahan')">
+          <div style="font-size:28px;margin-bottom:6px">🗺️</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1)">Pemetaan Lahan</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:3px">Pantau semua lahan se-Indonesia</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="nav('produk-trace')">
+          <div style="font-size:28px;margin-bottom:6px">🔗</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1)">Produk & Traceability</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:3px">${o.products.total} produk terlacak</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="nav('admin-certificates')">
+          <div style="font-size:28px;margin-bottom:6px">🏆</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1)">Semua Sertifikat ISPO</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:3px">${o.certificates} sertifikat aktif</div>
+        </div>
+      </div>
+    `;
+  };
+
+  window.rAdminUsers = async function(pg, tl){
+    tl.textContent = '👥 Manajemen User & Role';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>👥 Manajemen User & Role</h1>
+        <p>Kelola semua akun pengguna SI-ISPO — ubah role, suspend/aktifkan, atau tambah pengguna baru.</p>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+        <input class="inp" id="user-search" placeholder="🔍 Cari nama, email, atau organisasi..." style="max-width:380px" data-testid="user-search">
+        <select class="inp" id="user-role-filter" style="max-width:220px" data-testid="user-role-filter">
+          <option value="">Semua Role</option>
+          ${Object.keys(ROLE_LABELS).map(r=>`<option value="${r}">${ROLE_LABELS[r].ic} ${ROLE_LABELS[r].label}</option>`).join('')}
+        </select>
+        <div style="flex:1"></div>
+        <button class="btn btn-g" id="btn-new-user" data-testid="btn-new-user">+ Tambah User Baru</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="tbl-wrap" style="border:none;border-radius:0;max-height:600px">
+          <table class="tbl" data-testid="users-table">
+            <thead><tr>
+              <th>User</th><th>Email</th><th>Organisasi</th><th>Role</th><th>Status</th><th>Dibuat</th><th>Aksi</th>
+            </tr></thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    State.users = [];
+    try { State.users = await api('/users'); }
+    catch(e){ notify('❌ Gagal memuat user: '+e.message); return; }
+
+    const renderTable = ()=>{
+      const q = (document.getElementById('user-search').value||'').toLowerCase();
+      const rf = document.getElementById('user-role-filter').value;
+      let list = State.users.slice();
+      if (rf) list = list.filter(u => u.role===rf);
+      if (q) list = list.filter(u => (u.nama+u.email+(u.org||'')).toLowerCase().includes(q));
+      const tbody = document.getElementById('users-tbody');
+      tbody.innerHTML = list.map(u => {
+        const rl = ROLE_LABELS[u.role] || {label:u.role, ic:'•', cls:'b-gr'};
+        const av = (u.nama||'?').charAt(0).toUpperCase();
+        const dt = u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID') : '-';
+        return `<tr data-uid="${u.id}">
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--om),var(--o));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${av}</div>
+              <div class="cn">${u.nama}</div>
+            </div>
+          </td>
+          <td><span style="font-family:monospace;font-size:11.5px">${u.email}</span></td>
+          <td><span style="font-size:12px;color:var(--t2)">${u.org||'-'}</span></td>
+          <td>
+            <select class="inp role-sel" data-uid="${u.id}" style="padding:5px 8px;font-size:11.5px;width:auto;min-width:160px" data-testid="role-sel-${u.email}">
+              ${Object.keys(ROLE_LABELS).map(r=>`<option value="${r}" ${r===u.role?'selected':''}>${ROLE_LABELS[r].ic} ${ROLE_LABELS[r].label}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+            <span class="badge ${u.status==='Active'?'b-g':'b-r'}" style="cursor:pointer" data-status-toggle="${u.id}" data-testid="status-${u.email}">${u.status==='Active'?'✓ Aktif':'⊘ Suspend'}</span>
+          </td>
+          <td><span style="font-size:11.5px;color:var(--t3)">${dt}</span></td>
+          <td>
+            <button class="btn btn-red btn-sm" data-del="${u.id}" data-testid="del-${u.email}">🗑️</button>
+          </td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3)">Tidak ada user yang cocok</td></tr>';
+
+      // Wire up role selectors
+      tbody.querySelectorAll('.role-sel').forEach(sel => {
+        sel.onchange = async ()=>{
+          const uid = sel.dataset.uid;
+          const newRole = sel.value;
+          try {
+            await api(`/users/${uid}/role`, {
+              method:'PUT', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({role:newRole})
+            });
+            notify('✅ Role berhasil diubah ke '+ROLE_LABELS[newRole].label);
+            const u = State.users.find(x=>x.id===uid); if (u) u.role = newRole;
+          } catch(e){ notify('❌ Gagal: '+e.message); }
+        };
+      });
+      // Wire up status toggles
+      tbody.querySelectorAll('[data-status-toggle]').forEach(b => {
+        b.onclick = async ()=>{
+          const uid = b.dataset.statusToggle;
+          const u = State.users.find(x=>x.id===uid);
+          const newStatus = u.status==='Active' ? 'Suspended' : 'Active';
+          try{
+            const updated = await api(`/users/${uid}/status`, {
+              method:'PUT', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({status:newStatus})
+            });
+            u.status = updated.status;
+            notify('✅ Status: '+updated.status);
+            renderTable();
+          } catch(e){ notify('❌ Gagal: '+e.message); }
+        };
+      });
+      // Wire delete
+      tbody.querySelectorAll('[data-del]').forEach(b => {
+        b.onclick = async ()=>{
+          const uid = b.dataset.del;
+          const u = State.users.find(x=>x.id===uid);
+          if (!confirm(`Hapus user "${u.nama}" (${u.email})? Tindakan ini tidak bisa dibatalkan.`)) return;
+          try{
+            await api(`/users/${uid}`, {method:'DELETE'});
+            State.users = State.users.filter(x=>x.id!==uid);
+            notify('✅ User dihapus');
+            renderTable();
+          } catch(e){ notify('❌ Gagal: '+e.message); }
+        };
+      });
+    };
+
+    document.getElementById('user-search').oninput = renderTable;
+    document.getElementById('user-role-filter').onchange = renderTable;
+    document.getElementById('btn-new-user').onclick = ()=> openNewUserModal(renderTable);
+
+    renderTable();
+  };
+
+  function openNewUserModal(onCreated){
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:500px;width:100%;overflow:hidden" data-testid="new-user-modal">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--bd);background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:16px;font-weight:800">+ Tambah User Baru</div>
+          <button id="close-new-user" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:20px">
+          <div class="f"><label>Nama Lengkap <span class="req">*</span></label><input class="inp" id="nu-nama" data-testid="nu-nama" placeholder="Nama pengguna"></div>
+          <div class="f"><label>Email <span class="req">*</span></label><input class="inp" id="nu-email" type="email" data-testid="nu-email" placeholder="email@perusahaan.com"></div>
+          <div class="f"><label>Organisasi</label><input class="inp" id="nu-org" data-testid="nu-org" placeholder="Nama perusahaan/instansi"></div>
+          <div class="f"><label>Role <span class="req">*</span></label>
+            <select class="inp" id="nu-role" data-testid="nu-role">
+              ${Object.keys(ROLE_LABELS).filter(r=>r!=='superadmin').map(r=>`<option value="${r}">${ROLE_LABELS[r].ic} ${ROLE_LABELS[r].label}</option>`).join('')}
+              <option value="superadmin">🛡️ Super Admin</option>
+            </select>
+          </div>
+        </div>
+        <div style="padding:14px 20px;border-top:1px solid var(--bd);display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn btn-ghost" id="cancel-new-user">Batal</button>
+          <button class="btn btn-g" id="save-new-user" data-testid="save-new-user">Simpan</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    const close = ()=> ov.remove();
+    ov.querySelector('#close-new-user').onclick = close;
+    ov.querySelector('#cancel-new-user').onclick = close;
+    ov.querySelector('#save-new-user').onclick = async ()=>{
+      const payload = {
+        nama: ov.querySelector('#nu-nama').value.trim(),
+        email: ov.querySelector('#nu-email').value.trim(),
+        org: ov.querySelector('#nu-org').value.trim() || null,
+        role: ov.querySelector('#nu-role').value,
+      };
+      if (!payload.nama || !payload.email) { notify('⚠️ Nama & email wajib diisi'); return; }
+      try{
+        const created = await api('/users', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        State.users.unshift(created);
+        notify('✅ User baru dibuat: '+created.nama);
+        close();
+        onCreated && onCreated();
+      } catch(e){ notify('❌ Gagal: '+e.message); }
+    };
+  }
+
+  /* Generic read-only table page */
+  async function rAdminList(pg, tl, opts){
+    tl.textContent = opts.title;
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>${opts.title}</h1>
+        <p>${opts.subtitle}</p>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="tbl-wrap" style="border:none;border-radius:0">
+          <table class="tbl">
+            <thead><tr>${opts.cols.map(c=>`<th>${c.h}</th>`).join('')}</tr></thead>
+            <tbody id="admin-list-tbody"><tr><td colspan="${opts.cols.length}" style="text-align:center;padding:18px;color:var(--t3)">⏳ Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    let data;
+    try{ data = await api(opts.api); }
+    catch(e){ document.getElementById('admin-list-tbody').innerHTML = `<tr><td colspan="${opts.cols.length}" style="text-align:center;padding:18px;color:var(--r)">❌ ${e.message}</td></tr>`; return; }
+    const tb = document.getElementById('admin-list-tbody');
+    if (!data.length) {
+      tb.innerHTML = `<tr><td colspan="${opts.cols.length}" style="text-align:center;padding:24px;color:var(--t3)">Belum ada data</td></tr>`;
+      return;
+    }
+    tb.innerHTML = data.map(row => `<tr>${opts.cols.map(c => `<td>${c.render(row)}</td>`).join('')}</tr>`).join('');
+  }
+
+  window.rAdminCertificates = (pg, tl) => rAdminList(pg, tl, {
+    title: '🏆 Semua Sertifikat ISPO',
+    subtitle: 'Daftar lengkap sertifikat ISPO yang telah diterbitkan di seluruh sistem.',
+    api: '/certificates',
+    cols: [
+      {h:'Nomor', render:r=>`<span style="font-family:monospace;font-weight:600">${r.nomor}</span>`},
+      {h:'Pemegang', render:r=>`<div class="cn">${r.pemegang}</div><div class="cs">${r.tipe}</div>`},
+      {h:'Luas', render:r=>`${r.luas_ha} ha`},
+      {h:'Lembaga', render:r=>r.lembaga_sertifikasi},
+      {h:'Terbit', render:r=>r.tgl_terbit},
+      {h:'Kadaluarsa', render:r=>r.tgl_kadaluarsa},
+      {h:'Status', render:r=>`<span class="badge ${r.status==='Aktif'?'b-g':'b-gr'}">${r.status}</span>`},
+    ]
+  });
+
+  window.rAdminAudits = (pg, tl) => rAdminList(pg, tl, {
+    title: '🔍 Semua Audit ISPO',
+    subtitle: 'Pantau seluruh kegiatan audit ISPO yang sedang berjalan dan telah selesai.',
+    api: '/audits',
+    cols: [
+      {h:'Nomor', render:r=>`<span style="font-family:monospace;font-weight:600">${r.nomor}</span>`},
+      {h:'Perusahaan', render:r=>r.perusahaan},
+      {h:'Auditor', render:r=>r.auditor},
+      {h:'Tipe', render:r=>r.tipe},
+      {h:'Tanggal', render:r=>r.tgl_audit},
+      {h:'Status', render:r=>`<span class="badge ${r.status==='Selesai'?'b-g':r.status==='Berjalan'?'b-a':'b-gr'}">${r.status}</span>`},
+      {h:'Temuan', render:r=>`<span style="color:var(--r);font-weight:600">${r.temuan_major}</span> / <span style="color:var(--a);font-weight:600">${r.temuan_minor}</span>`},
+    ]
+  });
+
+  window.rAdminCompanies = (pg, tl) => rAdminList(pg, tl, {
+    title: '🏢 Semua Perusahaan',
+    subtitle: 'Daftar perusahaan/koperasi/pekebun yang terdaftar di SI-ISPO.',
+    api: '/companies',
+    cols: [
+      {h:'Nama', render:r=>`<div class="cn">${r.nama}</div>`},
+      {h:'NPWP', render:r=>r.npwp||'-'},
+      {h:'Tipe', render:r=>`<span class="badge b-b">${r.tipe}</span>`},
+      {h:'Provinsi', render:r=>r.provinsi||'-'},
+      {h:'Alamat', render:r=>`<span style="font-size:11.5px;color:var(--t2)">${r.alamat||'-'}</span>`},
+      {h:'Luas', render:r=>`${r.luas_ha||0} ha`},
+    ]
+  });
+
+  /* ================================================================
      PATCH renderPage to handle new pages
      ================================================================ */
   function patchRenderPage(){
     if (typeof renderPage !== 'function') return;
     const original = renderPage;
     window.renderPage = function(page){
+      const pg=document.getElementById('main-page'),tl=document.getElementById('tb-title');
+      // Super Admin sees a special dashboard
+      if (page === 'dashboard' && (typeof cRole !== 'undefined') && cRole === 'superadmin'){
+        return window.rAdminDashboard(pg, tl);
+      }
+      if (page === 'admin-users')        return window.rAdminUsers(pg, tl);
+      if (page === 'admin-certificates') return window.rAdminCertificates(pg, tl);
+      if (page === 'admin-audits')       return window.rAdminAudits(pg, tl);
+      if (page === 'admin-companies')    return window.rAdminCompanies(pg, tl);
       if (page === 'pemetaan-lahan'){
-        const pg=document.getElementById('main-page'),tl=document.getElementById('tb-title');
         loadPlots().then(()=> window.rPemetaanLahan(pg, tl)).catch(e=>{
           pg.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px">⚠️</div><div>Gagal memuat data lahan: '+e.message+'</div></div>';
         });
         return;
       }
       if (page === 'produk-trace'){
-        const pg=document.getElementById('main-page'),tl=document.getElementById('tb-title');
         loadProducts().then(()=> window.rProdukTrace(pg, tl)).catch(e=>{
           pg.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px">⚠️</div><div>Gagal memuat produk: '+e.message+'</div></div>';
         });
@@ -10296,6 +10691,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   /* ── Init ── */
   function init(){
     injectNav();
+    injectAdminLoginBtn();
     patchRenderPage();
     // Prefetch data
     loadPlots().catch(()=>{});

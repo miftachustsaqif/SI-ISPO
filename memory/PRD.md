@@ -52,3 +52,22 @@ User uploaded an HTML mockup file (`180526_SI-ISPO SCI.html`, ~856KB, ~10K lines
 
 ### Implementation Note
 New features are **injected** into the existing mockup HTML via a single appended `<script>` block (does not break original mockup). New nav items added to: LS, Pekebun, PKS, Perkebunan, Bioenergi, Buyer, Auditor roles.
+
+## Update — Super Admin Feature
+### Added
+- **Super Admin role** (`superadmin`) with custom sidebar (Dashboard Admin, Manajemen User, Pemetaan Lahan, Produk, Semua Sertifikat/Audit/Perusahaan).
+- **🛡️ Super Admin demo login button** — appears in login page demo grid.
+- **Dashboard Super Admin** — stats overview (users by role, products by kategori, plots, documents) + quick action cards.
+- **Manajemen User & Role** — table of all users with: inline role dropdown (instant change), status toggle (Active/Suspended), delete, search & filter, "+ Tambah User Baru" modal.
+- **Read-only admin views**: Semua Sertifikat, Semua Audit, Semua Perusahaan.
+
+### Backend
+- `GET/POST /api/users`, `GET /api/users/{id}` implicit via list filter
+- `PUT /api/users/{id}/role`, `PUT /api/users/{id}/status`
+- `DELETE /api/users/{id}`
+- `GET /api/admin/overview` (aggregate stats)
+- Seeded 10 users (1 superadmin + 9 role personas).
+
+### Credentials
+- Admin demo login: click "🛡️ Super Admin (Lihat & Atur Semua)" on login page (one-click, no password needed in mockup).
+- Backend account: `admin@si-ispo.go.id` (role: superadmin).

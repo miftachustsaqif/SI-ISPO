@@ -205,6 +205,38 @@ class ProductCreate(BaseModel):
     catatan: Optional[str] = None
 
 
+VALID_ROLES = ['superadmin', 'ls', 'pekebun', 'pks', 'buyer', 'auditor', 'auditor_int',
+               'reviewer', 'perkebunan', 'bioenergy']
+
+
+class User(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    nama: str
+    org: Optional[str] = None
+    role: str
+    status: str = "Active"  # Active / Suspended
+    last_login: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class UserCreate(BaseModel):
+    email: str
+    nama: str
+    org: Optional[str] = None
+    role: str
+    status: Optional[str] = "Active"
+
+
+class RoleUpdate(BaseModel):
+    role: str
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
 # ─────────── Routes ───────────
 @api_router.get("/")
 async def root():
@@ -461,6 +493,26 @@ async def trace_product(product_id: str):
 async def seed_demo():
     await db.plots.delete_many({})
     await db.products.delete_many({})
+    await db.users.delete_many({})
+
+    # Seed users (including the Super Admin)
+    seed_users = [
+        {"email": "admin@si-ispo.go.id", "nama": "Super Admin SI-ISPO", "org": "Kementerian Pertanian RI", "role": "superadmin"},
+        {"email": "ls@sucofindo.com", "nama": "LS SUCOFINDO", "org": "PT Sucofindo (Persero)", "role": "ls"},
+        {"email": "pekebun@test.com", "nama": "Kelompok Tani Makmur", "org": "Koperasi Tani Riau", "role": "pekebun"},
+        {"email": "pks@test.com", "nama": "PT Industri Sawit Makmur", "org": "PT Industri Sawit Makmur", "role": "pks"},
+        {"email": "buyer@test.com", "nama": "Global Oils Trading Ltd.", "org": "Global Oils Trading Ltd.", "role": "buyer"},
+        {"email": "auditor@test.com", "nama": "Siti Rahma, SST", "org": "LS SUCOFINDO", "role": "auditor"},
+        {"email": "auditor.int@test.com", "nama": "Ir. Suhartono, S.P.", "org": "PT Sawit Nusantara", "role": "auditor_int"},
+        {"email": "reviewer@test.com", "nama": "Dr. Hendra Wijaya", "org": "LS SUCOFINDO", "role": "reviewer"},
+        {"email": "perkebunan@test.com", "nama": "PT Sawit Nusantara", "org": "PT Sawit Nusantara", "role": "perkebunan"},
+        {"email": "bioenergy@test.com", "nama": "PT Bioenergi Sawit Indonesia", "org": "PT Bioenergi Sawit Indonesia", "role": "bioenergy"},
+    ]
+    for ud in seed_users:
+        u = User(**ud)
+        d = u.model_dump()
+        d["created_at"] = d["created_at"].isoformat()
+        await db.users.insert_one(d)
 
     plots_data = [
         {
@@ -632,6 +684,133 @@ async def seed_demo():
         "ok": True,
         "plots": len(plots_data),
         "products": await db.products.count_documents({}),
+    }
+
+
+# ─────────── Users / Roles management (Super Admin) ───────────
+@api_router.get("/users", response_model=List[User])
+async def list_users(role: Optional[str] = None, status: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if role:
+        q["role"] = role
+    if status:
+        q["status"] = status
+    items = await db.users.find(q, {"_id": 0}).to_list(1000)
+    for u in items:
+        if isinstance(u.get("created_at"), str):
+            u["created_at"] = datetime.fromisoformat(u["created_at"])
+    return items
+
+
+@api_router.post("/users", response_model=User)
+async def create_user(payload: UserCreate):
+    if payload.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of {VALID_ROLES}")
+    existing = await db.users.find_one({"email": payload.email})
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already exists")
+    obj = User(**payload.model_dump())
+    doc = obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.users.insert_one(doc)
+    return obj
+
+
+@api_router.put("/users/{user_id}/role", response_model=User)
+async def update_user_role(user_id: str, payload: RoleUpdate):
+    if payload.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of {VALID_ROLES}")
+    result = await db.users.find_one_and_update(
+        {"id": user_id},
+        {"$set": {"role": payload.role}},
+        return_document=True,
+        projection={"_id": 0}
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="User not found")
+    if isinstance(result.get("created_at"), str):
+        result["created_at"] = datetime.fromisoformat(result["created_at"])
+    return result
+
+
+@api_router.put("/users/{user_id}/status", response_model=User)
+async def update_user_status(user_id: str, payload: StatusUpdate):
+    if payload.status not in ("Active", "Suspended"):
+        raise HTTPException(status_code=400, detail="status must be Active or Suspended")
+    result = await db.users.find_one_and_update(
+        {"id": user_id},
+        {"$set": {"status": payload.status}},
+        return_document=True,
+        projection={"_id": 0}
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="User not found")
+    if isinstance(result.get("created_at"), str):
+        result["created_at"] = datetime.fromisoformat(result["created_at"])
+    return result
+
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str):
+    res = await db.users.delete_one({"id": user_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True}
+
+
+@api_router.get("/admin/overview")
+async def admin_overview():
+    """Aggregate stats across the entire system for the Super Admin dashboard."""
+    users_total = await db.users.count_documents({})
+    users_active = await db.users.count_documents({"status": "Active"})
+    users_suspended = await db.users.count_documents({"status": "Suspended"})
+
+    pipe = [{"$group": {"_id": "$role", "n": {"$sum": 1}}}]
+    by_role_raw = await db.users.aggregate(pipe).to_list(50)
+    users_by_role = {r["_id"]: r["n"] for r in by_role_raw}
+
+    plots_total = await db.plots.count_documents({})
+    plots_cert = await db.plots.count_documents({"status_ispo": "Tersertifikasi"})
+    plots_proses = await db.plots.count_documents({"status_ispo": "Proses"})
+    plots_blm = await db.plots.count_documents({"status_ispo": "Belum Sertifikasi"})
+
+    ha_pipe = [{"$group": {"_id": None, "total": {"$sum": "$luas_ha"}}}]
+    ha_res = await db.plots.aggregate(ha_pipe).to_list(1)
+    luas_total = float(ha_res[0]["total"]) if ha_res else 0
+
+    products_total = await db.products.count_documents({})
+    p_pipe = [{"$group": {"_id": "$kategori", "n": {"$sum": 1}}}]
+    p_by_cat_raw = await db.products.aggregate(p_pipe).to_list(50)
+    products_by_kategori = {r["_id"]: r["n"] for r in p_by_cat_raw}
+
+    certs_total = await db.certificates.count_documents({})
+    audits_total = await db.audits.count_documents({})
+    companies_total = await db.companies.count_documents({})
+
+    docs_pipe = [
+        {"$project": {"docs": {"$size": {"$ifNull": ["$documents", []]}}}},
+        {"$group": {"_id": None, "total": {"$sum": "$docs"}}},
+    ]
+    docs_res = await db.plots.aggregate(docs_pipe).to_list(1)
+    documents_total = int(docs_res[0]["total"]) if docs_res else 0
+
+    return {
+        "users": {
+            "total": users_total, "active": users_active, "suspended": users_suspended,
+            "by_role": users_by_role,
+        },
+        "plots": {
+            "total": plots_total, "tersertifikasi": plots_cert,
+            "proses": plots_proses, "belum": plots_blm,
+            "luas_total_ha": luas_total,
+        },
+        "products": {
+            "total": products_total, "by_kategori": products_by_kategori,
+        },
+        "certificates": certs_total,
+        "audits": audits_total,
+        "companies": companies_total,
+        "documents": documents_total,
     }
 
 
