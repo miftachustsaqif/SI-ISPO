@@ -179,15 +179,23 @@ class Product(BaseModel):
     kode: str
     nama: str
     kategori: str  # 'Hulu', 'Rafinasi', 'Pangan', 'Oleokimia', 'Bioenergi'
-    jenis: str  # e.g. 'TBS', 'CPO', 'RBD Palm Oil', 'Biodiesel', 'Sabun'
+    jenis: str
     produsen: str
     jumlah: float = 0
     satuan: str = "ton"
     batch_date: Optional[str] = None
-    plot_id: Optional[str] = None  # for TBS — origin plot
-    parent_ids: List[str] = []  # upstream products
+    plot_id: Optional[str] = None  # for TBS — origin plot (required for Hulu)
+    parent_ids: List[str] = []  # upstream products (required for non-Hulu)
     status: str = "Active"
     catatan: Optional[str] = None
+    # Marketplace fields
+    harga: Optional[float] = None
+    mata_uang: str = "IDR"
+    tersedia_marketplace: bool = False
+    deskripsi: Optional[str] = None
+    spesifikasi: Optional[str] = None
+    minimum_order: Optional[float] = None
+    lokasi_gudang: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -203,6 +211,13 @@ class ProductCreate(BaseModel):
     plot_id: Optional[str] = None
     parent_ids: List[str] = []
     catatan: Optional[str] = None
+    harga: Optional[float] = None
+    mata_uang: Optional[str] = "IDR"
+    tersedia_marketplace: Optional[bool] = False
+    deskripsi: Optional[str] = None
+    spesifikasi: Optional[str] = None
+    minimum_order: Optional[float] = None
+    lokasi_gudang: Optional[str] = None
 
 
 VALID_ROLES = ['superadmin', 'ls', 'pekebun', 'pks', 'buyer', 'auditor', 'auditor_int',
@@ -439,11 +454,44 @@ async def get_product(product_id: str):
 
 @api_router.post("/products", response_model=Product)
 async def create_product(payload: ProductCreate):
+    # Enforce traceability: Hulu products MUST originate from a plot;
+    # downstream products MUST cite their parent products.
+    if payload.kategori == "Hulu":
+        if not payload.plot_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Produk kategori 'Hulu' (TBS) wajib mencantumkan plot_id (kebun asal)."
+            )
+        plot_exists = await db.plots.find_one({"id": payload.plot_id}, {"_id": 0})
+        if not plot_exists:
+            raise HTTPException(status_code=400, detail="plot_id tidak ditemukan di database lahan.")
+    else:
+        if not payload.parent_ids or len(payload.parent_ids) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Produk kategori '{payload.kategori}' wajib mencantumkan minimal 1 parent_id (bahan baku/produk hulu) untuk traceability."
+            )
+        for pid in payload.parent_ids:
+            parent = await db.products.find_one({"id": pid}, {"_id": 0})
+            if not parent:
+                raise HTTPException(status_code=400, detail=f"parent_id {pid} tidak ditemukan.")
     obj = Product(**payload.model_dump())
     doc = obj.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.products.insert_one(doc)
     return obj
+
+
+@api_router.get("/marketplace", response_model=List[Product])
+async def list_marketplace(kategori: Optional[str] = None):
+    q: Dict[str, Any] = {"tersedia_marketplace": True}
+    if kategori:
+        q["kategori"] = kategori
+    items = await db.products.find(q, {"_id": 0}).to_list(1000)
+    for p in items:
+        if isinstance(p.get("created_at"), str):
+            p["created_at"] = datetime.fromisoformat(p["created_at"])
+    return items
 
 
 @api_router.get("/products/{product_id}/trace")
@@ -631,16 +679,32 @@ async def seed_demo():
     # ── Pangan ──
     mg = Product(kode="MG-001", nama="Minyak Goreng SawitMurni 1L", kategori="Pangan",
                  jenis="Minyak Goreng Sawit", produsen="PT Pangan Sawit", jumlah=80000, satuan="liter",
-                 batch_date="2025-02-20", parent_ids=[olein.id])
+                 batch_date="2025-02-20", parent_ids=[olein.id],
+                 harga=18500, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Minyak goreng kelapa sawit kualitas premium, ISPO bersertifikat. Diproses dengan teknologi rafinasi modern.",
+                 spesifikasi="Volume: 1L | FFA: <0.1% | Moisture: <0.1% | Kemasan: PET botol",
+                 minimum_order=1000, lokasi_gudang="Gudang Medan, Sumatera Utara")
     marg = Product(kode="MARG-001", nama="Margarin Premium 250g", kategori="Pangan",
                    jenis="Margarin", produsen="PT Pangan Sawit", jumlah=50000, satuan="pcs",
-                   batch_date="2025-02-22", parent_ids=[stearin.id, olein.id])
+                   batch_date="2025-02-22", parent_ids=[stearin.id, olein.id],
+                   harga=12000, mata_uang="IDR", tersedia_marketplace=True,
+                   deskripsi="Margarin premium dengan komposisi blend palm stearin & olein. Cocok untuk industri bakery.",
+                   spesifikasi="Berat: 250g | SFC@10°C: 60% | Melting point: 38°C | Halal MUI",
+                   minimum_order=500, lokasi_gudang="Gudang Surabaya, Jawa Timur")
     sf = Product(kode="SF-001", nama="Specialty Fats (CBS) 25kg", kategori="Pangan",
                  jenis="Lemak Khusus (Specialty Fats)", produsen="PT Pangan Sawit", jumlah=8000, satuan="kg",
-                 batch_date="2025-02-25", parent_ids=[stearin.id])
+                 batch_date="2025-02-25", parent_ids=[stearin.id],
+                 harga=85000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Cocoa Butter Substitute (CBS) untuk industri konfeksioneri & coklat. Profil leleh setara CB.",
+                 spesifikasi="Berat: 25kg/karton | SMP: 32-34°C | SFC: matched cocoa butter | Trans fat free",
+                 minimum_order=200, lokasi_gudang="Gudang Jakarta")
     pkn = Product(kode="PKN-001", nama="Pakan Ternak Berbasis Sawit", kategori="Pangan",
                   jenis="Pakan Ternak Berbasis Sawit", produsen="PT Pakan Nusantara", jumlah=15000, satuan="kg",
-                  batch_date="2025-02-26", parent_ids=[created["TBS-RIA-001"]])
+                  batch_date="2025-02-26", parent_ids=[created["TBS-RIA-001"]],
+                  harga=6500, mata_uang="IDR", tersedia_marketplace=True,
+                  deskripsi="Pakan ternak berbasis bungkil kelapa sawit. Sumber protein nabati untuk ternak ruminansia.",
+                  spesifikasi="Protein: 16% | Lemak: 8% | Serat kasar: 12% | Kemasan karung 25kg",
+                  minimum_order=1000, lokasi_gudang="Gudang Pekanbaru, Riau")
     for c in [mg, marg, sf, pkn]:
         d = c.model_dump(); d["created_at"] = d["created_at"].isoformat()
         await db.products.insert_one(d); created[c.kode] = c.id
@@ -648,19 +712,39 @@ async def seed_demo():
     # ── Oleokimia ──
     fa = Product(kode="FA-001", nama="Asam Lemak (Fatty Acid)", kategori="Oleokimia",
                  jenis="Asam Lemak (Fatty Acids)", produsen="PT Oleo Indonesia", jumlah=180, satuan="ton",
-                 batch_date="2025-03-01", parent_ids=[created["PKO-RIA-001"]])
+                 batch_date="2025-03-01", parent_ids=[created["PKO-RIA-001"]],
+                 harga=14500000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Asam lemak hasil splitting PKO. Bahan baku industri sabun, deterjen, dan oleokimia lanjutan.",
+                 spesifikasi="Acid value: 200-210 | Iodine value: 50-60 | Saponification value: 200-210",
+                 minimum_order=20, lokasi_gudang="Gudang Dumai, Riau")
     gl = Product(kode="GL-001", nama="Gliserol Industri", kategori="Oleokimia",
                  jenis="Gliserol / Gliserin", produsen="PT Oleo Indonesia", jumlah=45, satuan="ton",
-                 batch_date="2025-03-01", parent_ids=[created["PKO-RIA-001"]])
+                 batch_date="2025-03-01", parent_ids=[created["PKO-RIA-001"]],
+                 harga=11000000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Gliserol crude hasil samping splitting fatty acid. Untuk industri kosmetik, farmasi, makanan.",
+                 spesifikasi="Glycerol content: 80% min | Color: <100 APHA | Water: <15%",
+                 minimum_order=10, lokasi_gudang="Gudang Dumai, Riau")
     me = Product(kode="ME-001", nama="Metil Ester", kategori="Oleokimia",
                  jenis="Metil Ester", produsen="PT Oleo Indonesia", jumlah=220, satuan="ton",
-                 batch_date="2025-03-03", parent_ids=[cpo3.id])
+                 batch_date="2025-03-03", parent_ids=[cpo3.id],
+                 harga=13800000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Fatty Acid Methyl Ester (FAME) hasil transesterifikasi CPO. Feedstock biodiesel.",
+                 spesifikasi="Ester content: 96.5% min | Sulfur: <10 ppm | Cetane: 51 min",
+                 minimum_order=25, lokasi_gudang="Gudang Cilegon, Banten")
     sb = Product(kode="SB-001", nama="Sabun Mandi Berbasis Sawit", kategori="Oleokimia",
                  jenis="Sabun & Deterjen Berbasis Sawit", produsen="PT Sabun Nusantara", jumlah=120000, satuan="pcs",
-                 batch_date="2025-03-05", parent_ids=[fa.id])
+                 batch_date="2025-03-05", parent_ids=[fa.id],
+                 harga=4500, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Sabun mandi batang berbahan dasar palm fatty acid. Pelembab alami, aroma natural.",
+                 spesifikasi="Berat: 80g/pcs | TFM: 76% | Halal MUI | Eco-friendly packaging",
+                 minimum_order=2000, lokasi_gudang="Gudang Bekasi, Jawa Barat")
     ks = Product(kode="KS-001", nama="Lotion Perawatan Tubuh", kategori="Oleokimia",
                  jenis="Kosmetik & Perawatan Tubuh", produsen="PT Beauty Sawit", jumlah=25000, satuan="pcs",
-                 batch_date="2025-03-08", parent_ids=[fa.id, gl.id])
+                 batch_date="2025-03-08", parent_ids=[fa.id, gl.id],
+                 harga=28000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Body lotion dengan gliserin & emolien dari sawit berkelanjutan. Free paraben, halal certified.",
+                 spesifikasi="Volume: 200ml | pH: 5.5 | Tested: dermatology safe | Halal MUI",
+                 minimum_order=500, lokasi_gudang="Gudang Jakarta")
     for c in [fa, gl, me, sb, ks]:
         d = c.model_dump(); d["created_at"] = d["created_at"].isoformat()
         await db.products.insert_one(d); created[c.kode] = c.id
@@ -669,13 +753,25 @@ async def seed_demo():
     bd = Product(kode="BD-001", nama="Biodiesel B30", kategori="Bioenergi",
                  jenis="Biodiesel (Bahan Bakar Nabati)", produsen="PT Bioenergi Sawit Indonesia",
                  jumlah=210, satuan="ton", batch_date="2025-03-10",
-                 parent_ids=[me.id, olein.id])
+                 parent_ids=[me.id, olein.id],
+                 harga=12500000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Biodiesel campuran B30 sesuai mandatory pemerintah RI. Penggunaan untuk transportasi & industri.",
+                 spesifikasi="Cetane: 51 min | Density: 850-890 kg/m³ | Sulfur: <50 ppm | EN 14214 compliant",
+                 minimum_order=50, lokasi_gudang="Terminal Tj. Priok, Jakarta")
     bm = Product(kode="BM-001", nama="Biomassa Cangkang Sawit", kategori="Bioenergi",
                  jenis="Biomassa", produsen="PT Bioenergi Sawit Indonesia", jumlah=350, satuan="ton",
-                 batch_date="2025-03-11", parent_ids=[created["TBS-KBR-001"]])
+                 batch_date="2025-03-11", parent_ids=[created["TBS-KBR-001"]],
+                 harga=850000, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Palm Kernel Shell (PKS) untuk bahan bakar boiler/PLTU biomassa. Renewable energy source.",
+                 spesifikasi="Calorific value: 4200 kcal/kg | Moisture: <15% | Ash: <5%",
+                 minimum_order=100, lokasi_gudang="Pelabuhan Pontianak, Kalbar")
     bg = Product(kode="BG-001", nama="Biogas dari POME", kategori="Bioenergi",
                  jenis="Biogas (POME)", produsen="PT Bioenergi Sawit Indonesia", jumlah=85000, satuan="m³",
-                 batch_date="2025-03-12", parent_ids=[cpo2.id])
+                 batch_date="2025-03-12", parent_ids=[cpo2.id],
+                 harga=4500, mata_uang="IDR", tersedia_marketplace=True,
+                 deskripsi="Biogas hasil pengolahan POME (Palm Oil Mill Effluent). Untuk pembangkit listrik on-site.",
+                 spesifikasi="Methane content: 55-65% | H2S: <500 ppm | Pressure: 50-100 mbar",
+                 minimum_order=5000, lokasi_gudang="Pabrik Ketapang, Kalbar")
     for c in [bd, bm, bg]:
         d = c.model_dump(); d["created_at"] = d["created_at"].isoformat()
         await db.products.insert_one(d); created[c.kode] = c.id

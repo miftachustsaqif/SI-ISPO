@@ -71,3 +71,25 @@ New features are **injected** into the existing mockup HTML via a single appende
 ### Credentials
 - Admin demo login: click "🛡️ Super Admin (Lihat & Atur Semua)" on login page (one-click, no password needed in mockup).
 - Backend account: `admin@si-ispo.go.id` (role: superadmin).
+
+## Update — Marketplace + Product Detail + Supplier Form
+### Added
+- **Marketplace ISPO** (`marketplace`) — Grid of products available for sale, each card has "✓ HULU→HILIR TRACKED" badge, price/satuan, min order, produsen, lokasi gudang, category filter.
+- **Product Detail page** (`produk-detail`) — Full product view: large icon, deskripsi, spesifikasi teknis (parsed from `|`-separated string), harga & min order, Request Quote button, **inline traceability tree** showing every parent product down to TBS + origin plot (with ISPO status).
+- **Tambah Produk Baru modal** — Available to supplier roles (pekebun, pks, perkebunan, bioenergy, superadmin) via button on Produk page. Form has mandatory "Rantai Traceability" section that adapts:
+  - Hulu (TBS) → must select Kebun Asal (plot)
+  - Non-Hulu → must select 1+ parent products (multi-select from existing products)
+- Marketplace pricing (12 of 22 seed products have prices), spesifikasi, deskripsi, lokasi gudang.
+
+### Backend Validation (enforced)
+- `POST /api/products` rejects:
+  - Hulu without `plot_id` → 400 "wajib mencantumkan plot_id (kebun asal)"
+  - Non-Hulu without `parent_ids` → 400 "wajib mencantumkan minimal 1 parent_id"
+  - Invalid plot_id or parent_id → 400
+- New endpoint: `GET /api/marketplace?kategori=X` (filters `tersedia_marketplace=true`)
+- Product schema extended with: `harga`, `mata_uang`, `tersedia_marketplace`, `deskripsi`, `spesifikasi`, `minimum_order`, `lokasi_gudang`
+
+### Role-Based Access
+- All roles (incl. buyer/auditor/reviewer) can browse Marketplace & view Product Detail
+- Only supplier roles see "+ Tambah Produk Baru" button on Produk page
+- Super Admin nav now includes Marketplace ISPO too

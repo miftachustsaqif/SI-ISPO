@@ -9832,6 +9832,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           {id:'admin-users',       label:'Manajemen User & Role', icon:'👥'},
           {id:'pemetaan-lahan',    label:'Pemetaan Lahan',        icon:'🗺️'},
           {id:'produk-trace',      label:'Produk & Traceability', icon:'🔗'},
+          {id:'marketplace',       label:'Marketplace ISPO',      icon:'🛒'},
           {id:'admin-certificates',label:'Semua Sertifikat',      icon:'🏆'},
           {id:'admin-audits',      label:'Semua Audit',           icon:'🔍'},
           {id:'admin-companies',   label:'Semua Perusahaan',      icon:'🏢'},
@@ -9842,13 +9843,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
     const lahanItem = {id:'pemetaan-lahan', label:'Pemetaan Lahan', icon:'🗺️'};
     const traceItem = {id:'produk-trace',   label:'Produk & Traceability', icon:'🔗'};
+    const mktItem   = {id:'marketplace',    label:'Marketplace ISPO', icon:'🛒'};
     const targets = {
-      ls:           [lahanItem, traceItem],
-      pekebun:      [lahanItem, traceItem],
-      pks:          [lahanItem, traceItem],
-      perkebunan:   [lahanItem, traceItem],
-      bioenergy:    [traceItem],
-      buyer:        [traceItem],
+      ls:           [lahanItem, traceItem, mktItem],
+      pekebun:      [lahanItem, traceItem, mktItem],
+      pks:          [lahanItem, traceItem, mktItem],
+      perkebunan:   [lahanItem, traceItem, mktItem],
+      bioenergy:    [traceItem, mktItem],
+      buyer:        [traceItem, mktItem],
       auditor:      [lahanItem],
       auditor_int:  [lahanItem],
     };
@@ -10657,8 +10659,354 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   /* ================================================================
-     PATCH renderPage to handle new pages
+     MARKETPLACE + PRODUCT DETAIL + TAMBAH PRODUK
      ================================================================ */
+  const SUPPLIER_ROLES = ['pekebun','pks','perkebunan','bioenergy','superadmin'];
+
+  function fmtRp(n, satuan){
+    if (n == null) return '-';
+    return 'Rp ' + Number(n).toLocaleString('id-ID') + (satuan?'/'+satuan:'');
+  }
+
+  /* ── MARKETPLACE ── */
+  window.rMarketplace = async function(pg, tl){
+    tl.textContent = '🛒 Marketplace ISPO';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🛒 Marketplace ISPO — Produk Sawit Berkelanjutan</h1>
+        <p>Semua produk yang dijual di sini sudah <b>terlacak hulu→hilir</b>, dari TBS kebun ISPO sampai produk turunan akhir.</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="mkt-filter"></div>
+      <div id="mkt-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px"></div>
+    `;
+
+    let items = [];
+    try{ items = await api('/marketplace'); }
+    catch(e){ document.getElementById('mkt-grid').innerHTML = '<div style="color:var(--r);padding:20px">❌ '+e.message+'</div>'; return; }
+
+    State.marketplaceItems = items;
+    const kats = ['Semua', ...Array.from(new Set(items.map(p=>p.kategori)))];
+    const filterEl = document.getElementById('mkt-filter');
+    filterEl.innerHTML = kats.map((k,i)=>{
+      const kc = KAT_COLORS[k] || {ic:'🌐'};
+      return `<button class="btn ${i===0?'btn-g':'btn-ghost'} btn-sm mkt-kat-btn" data-k="${k}">${k==='Semua'?'🌐':kc.ic} ${k}</button>`;
+    }).join('');
+    filterEl.querySelectorAll('.mkt-kat-btn').forEach(b => {
+      b.onclick = ()=>{
+        filterEl.querySelectorAll('.mkt-kat-btn').forEach(x=>{x.classList.remove('btn-g');x.classList.add('btn-ghost')});
+        b.classList.add('btn-g'); b.classList.remove('btn-ghost');
+        const k = b.dataset.k;
+        renderMktGrid(k==='Semua'?null:k);
+      };
+    });
+
+    renderMktGrid(null);
+  };
+
+  function renderMktGrid(kat){
+    const grid = document.getElementById('mkt-grid');
+    if (!grid) return;
+    let list = State.marketplaceItems||[];
+    if (kat) list = list.filter(p => p.kategori===kat);
+    if (!list.length){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--t3)">Tidak ada produk di kategori ini</div>';
+      return;
+    }
+    grid.innerHTML = list.map(p => {
+      const c = KAT_COLORS[p.kategori]||{bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+      return `<div class="mkt-card" data-id="${p.id}" data-testid="mkt-card-${p.kode}" style="background:#fff;border:1px solid var(--bd);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .2s;box-shadow:var(--shadow);display:flex;flex-direction:column">
+        <div style="height:140px;background:linear-gradient(135deg,${c.bg},#fff);display:flex;align-items:center;justify-content:center;position:relative;font-size:54px">
+          ${c.ic}
+          <div style="position:absolute;top:8px;left:8px;background:rgba(22,163,74,.95);color:#fff;padding:4px 9px;border-radius:6px;font-size:10px;font-weight:700">✓ HULU→HILIR TRACKED</div>
+          <div style="position:absolute;top:8px;right:8px"><span class="badge" style="background:${c.bg};color:${c.fg}">${p.kategori}</span></div>
+        </div>
+        <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column">
+          <div style="font-family:monospace;font-size:10.5px;color:var(--t3);margin-bottom:2px">${p.kode}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1);line-height:1.3;min-height:36px">${p.nama}</div>
+          <div style="font-size:11.5px;color:var(--t2);margin-top:3px">${p.jenis}</div>
+          <div style="font-size:11.5px;color:var(--t3);margin-top:6px;display:flex;align-items:center;gap:4px">🏢 ${p.produsen}</div>
+          ${p.lokasi_gudang?`<div style="font-size:11px;color:var(--t3);display:flex;align-items:center;gap:4px;margin-top:2px">📍 ${p.lokasi_gudang}</div>`:''}
+          <div style="margin-top:auto;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end">
+            <div>
+              <div style="font-size:11px;color:var(--t3)">Mulai dari</div>
+              <div style="font-size:16px;font-weight:800;color:var(--g)">${fmtRp(p.harga,p.satuan)}</div>
+              ${p.minimum_order?`<div style="font-size:10.5px;color:var(--t3)">Min ${p.minimum_order.toLocaleString('id-ID')} ${p.satuan}</div>`:''}
+            </div>
+            <button class="btn btn-out btn-sm" style="font-size:11px">🔍 Detail</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    grid.querySelectorAll('.mkt-card').forEach(card => {
+      card.onmouseenter = ()=>{ card.style.transform='translateY(-3px)'; card.style.boxShadow='var(--shadow-lg)'; };
+      card.onmouseleave = ()=>{ card.style.transform=''; card.style.boxShadow='var(--shadow)'; };
+      card.onclick = ()=>{ openProductDetail(card.dataset.id); };
+    });
+  }
+
+  /* ── PRODUCT DETAIL PAGE ── */
+  async function openProductDetail(productId){
+    State.currentProductId = productId;
+    nav('produk-detail');
+  }
+
+  window.rProdukDetail = async function(pg, tl){
+    const id = State.currentProductId;
+    if (!id) { pg.innerHTML = '<div class="card" style="padding:30px;text-align:center">⚠️ Tidak ada produk dipilih</div>'; return; }
+    tl.textContent = '📦 Detail Produk';
+    pg.innerHTML = '<div style="text-align:center;padding:40px;color:var(--t3)">⏳ Memuat detail produk & rantai traceability...</div>';
+    let product, trace;
+    try{
+      product = await api(`/products/${id}`);
+      trace = await api(`/products/${id}/trace`);
+    } catch(e){
+      pg.innerHTML = '<div class="card" style="padding:30px;text-align:center;color:var(--r)">❌ '+e.message+'</div>';
+      return;
+    }
+    const c = KAT_COLORS[product.kategori]||{bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+    const inMkt = product.tersedia_marketplace;
+
+    pg.innerHTML = `
+      <button class="btn btn-ghost btn-sm" id="pd-back" style="margin-bottom:12px" data-testid="pd-back">← Kembali</button>
+      <div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start" id="pd-grid">
+        <div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="height:240px;background:linear-gradient(135deg,${c.bg},#fff);display:flex;align-items:center;justify-content:center;font-size:96px;position:relative">
+              ${c.ic}
+              ${inMkt?'<div style="position:absolute;top:10px;left:10px;background:rgba(22,163,74,.95);color:#fff;padding:5px 10px;border-radius:6px;font-size:10.5px;font-weight:700">✓ HULU→HILIR TRACKED</div>':''}
+            </div>
+            <div style="padding:18px">
+              <div style="display:flex;justify-content:space-between;align-items:start;gap:6px;margin-bottom:6px">
+                <span class="badge" style="background:${c.bg};color:${c.fg}">${c.ic} ${product.kategori}</span>
+                <span style="font-family:monospace;font-size:11px;color:var(--t3)">${product.kode}</span>
+              </div>
+              <h2 style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:4px">${product.nama}</h2>
+              <div style="font-size:13px;color:var(--t2)">${product.jenis}</div>
+              <div class="divider"></div>
+              <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Harga</div>
+              <div style="font-size:22px;font-weight:800;color:var(--g)">${fmtRp(product.harga, product.satuan)}</div>
+              ${product.minimum_order?`<div style="font-size:11.5px;color:var(--t2);margin-top:2px">Min order: ${product.minimum_order.toLocaleString('id-ID')} ${product.satuan}</div>`:''}
+              <div class="divider"></div>
+              <div style="font-size:12px;color:var(--t2);margin-bottom:4px">🏢 <b style="color:var(--t1)">${product.produsen}</b></div>
+              ${product.lokasi_gudang?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">📍 ${product.lokasi_gudang}</div>`:''}
+              ${product.batch_date?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">📅 Batch: ${product.batch_date}</div>`:''}
+              <div style="font-size:12px;color:var(--t2);margin-bottom:4px">📦 Stok: ${product.jumlah.toLocaleString('id-ID')} ${product.satuan}</div>
+              ${inMkt?`<button class="btn btn-g" style="width:100%;justify-content:center;margin-top:14px" data-testid="btn-buy">🛒 Request Quote</button>`:''}
+            </div>
+          </div>
+        </div>
+        <div>
+          ${product.deskripsi?`<div class="card" style="margin-bottom:12px">
+            <div class="card-title">📝 Deskripsi Produk</div>
+            <div style="font-size:13px;color:var(--t1);line-height:1.6">${product.deskripsi}</div>
+          </div>`:''}
+          ${product.spesifikasi?`<div class="card" style="margin-bottom:12px">
+            <div class="card-title">⚙️ Spesifikasi</div>
+            <div style="font-size:13px;color:var(--t1);line-height:1.7;background:var(--gl);padding:10px 12px;border-radius:8px;font-family:monospace;font-size:12px">${product.spesifikasi.replace(/\|/g,'<br>')}</div>
+          </div>`:''}
+          <div class="card">
+            <div class="card-title">🔗 Traceability Hulu → Hilir <span class="badge b-g">Wajib Lengkap</span></div>
+            <div style="font-size:12px;color:var(--t2);margin-bottom:14px;padding:8px 10px;background:var(--gs);border-left:3px solid #16A34A;border-radius:4px">
+              Setiap penyedia produk wajib mencantumkan asal-usul bahan baku. Sistem otomatis menolak produk turunan tanpa parent (bahan baku) dan TBS tanpa kebun asal.
+            </div>
+            <div id="pd-trace"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('pd-back').onclick = ()=>{
+      // go back to previous page in nav history (default to produk-trace)
+      const back = State.prevPage || 'produk-trace';
+      nav(back);
+    };
+    const buyBtn = document.querySelector('[data-testid="btn-buy"]');
+    if (buyBtn) buyBtn.onclick = ()=> notify('💬 Permintaan quote dikirim ke '+product.produsen);
+    renderTraceTree(trace, document.getElementById('pd-trace'));
+  };
+
+  /* ── TAMBAH PRODUK BARU (untuk supplier roles) ── */
+  function openTambahProdukModal(){
+    const ov = document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:780px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden" data-testid="tambah-produk-modal">
+        <div style="padding:18px 22px;border-bottom:1px solid var(--bd);background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:17px;font-weight:800">+ Tambah Produk Baru</div>
+            <div style="font-size:12px;opacity:.85;margin-top:2px">Wajib cantumkan rantai traceability (bahan baku atau kebun asal)</div>
+          </div>
+          <button id="tp-close" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:22px">
+          <div class="g2">
+            <div class="f"><label>Kode Produk <span class="req">*</span></label><input class="inp" id="tp-kode" data-testid="tp-kode" placeholder="mis. BD-002"></div>
+            <div class="f"><label>Nama Produk <span class="req">*</span></label><input class="inp" id="tp-nama" data-testid="tp-nama" placeholder="Biodiesel B30 Batch Mar-2025"></div>
+          </div>
+          <div class="g2">
+            <div class="f"><label>Kategori <span class="req">*</span></label>
+              <select class="inp" id="tp-kategori" data-testid="tp-kategori">
+                <option value="Hulu">🌴 Hulu (TBS)</option>
+                <option value="Rafinasi">🛢️ Rafinasi (CPO/PKO/RBD/Olein/Stearin)</option>
+                <option value="Pangan">🍳 Pangan (Minyak Goreng, Margarin, dll)</option>
+                <option value="Oleokimia">🧪 Oleokimia (Sabun, Kosmetik, dll)</option>
+                <option value="Bioenergi">⚡ Bioenergi (Biodiesel, Biogas)</option>
+              </select>
+            </div>
+            <div class="f"><label>Jenis <span class="req">*</span></label><input class="inp" id="tp-jenis" data-testid="tp-jenis" placeholder="mis. CPO, Biodiesel"></div>
+          </div>
+          <div class="f"><label>Produsen <span class="req">*</span></label><input class="inp" id="tp-produsen" data-testid="tp-produsen" placeholder="Nama perusahaan/koperasi"></div>
+          <div class="g3">
+            <div class="f"><label>Jumlah</label><input class="inp" type="number" id="tp-jumlah" value="100"></div>
+            <div class="f"><label>Satuan</label><input class="inp" id="tp-satuan" value="ton"></div>
+            <div class="f"><label>Tanggal Batch</label><input class="inp" type="date" id="tp-batch"></div>
+          </div>
+
+          <!-- Traceability section: dynamic -->
+          <div style="background:var(--gs);border:1.5px solid var(--gbd);border-radius:10px;padding:14px;margin-top:6px;margin-bottom:14px">
+            <div style="font-size:13px;font-weight:700;color:#16A34A;margin-bottom:4px">🔗 Rantai Traceability <span class="badge b-g">Wajib</span></div>
+            <div style="font-size:11.5px;color:var(--t2);margin-bottom:10px">Sistem akan menolak produk yang tidak punya asal-usul. Pilih kebun asal (untuk TBS) atau bahan baku (untuk produk turunan).</div>
+            <div id="tp-trace-section"></div>
+          </div>
+
+          <div class="g2">
+            <div class="f"><label>Harga (IDR per satuan)</label><input class="inp" type="number" id="tp-harga" placeholder="100000"></div>
+            <div class="f"><label>Lokasi Gudang</label><input class="inp" id="tp-gudang" placeholder="Gudang Medan, Sumatera Utara"></div>
+          </div>
+          <div class="f"><label>Deskripsi</label><textarea class="inp" id="tp-deskripsi" placeholder="Deskripsi produk, manfaat, kualitas..."></textarea></div>
+          <div class="f"><label>Spesifikasi Teknis (pisahkan dengan |)</label><textarea class="inp" id="tp-spek" placeholder="Volume: 1L | FFA: <0.1% | Halal MUI"></textarea></div>
+          <div class="f"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="tp-mkt" checked data-testid="tp-mkt"> Tampilkan di Marketplace (publik)</label></div>
+        </div>
+        <div style="padding:14px 22px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div id="tp-msg" style="font-size:12px;color:var(--t3)"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" id="tp-cancel">Batal</button>
+            <button class="btn btn-g" id="tp-save" data-testid="tp-save">💾 Simpan Produk</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+
+    // Render trace section depending on kategori
+    function renderTraceSection(){
+      const kat = document.getElementById('tp-kategori').value;
+      const sec = document.getElementById('tp-trace-section');
+      if (kat === 'Hulu'){
+        // pick plot
+        const plotOpts = (State.plots||[]).map(p => `<option value="${p.id}">${p.nama} — ${p.pemilik} (${p.luas_ha} ha, ${p.provinsi})</option>`).join('');
+        sec.innerHTML = `
+          <div class="f"><label>🗺️ Kebun Asal (Plot) <span class="req">*</span></label>
+            <select class="inp" id="tp-plot" data-testid="tp-plot">
+              <option value="">— Pilih kebun asal TBS —</option>${plotOpts}
+            </select>
+            <div style="font-size:11px;color:var(--t3);margin-top:4px">Wajib pilih kebun (lahan) sumber panen TBS untuk traceability.</div>
+          </div>`;
+      } else {
+        // pick parent products (multi-select)
+        const opts = (State.products||[]).map(p => {
+          const kc = KAT_COLORS[p.kategori]||{ic:'•'};
+          return `<option value="${p.id}">${kc.ic} ${p.kode} — ${p.nama} (${p.kategori})</option>`;
+        }).join('');
+        sec.innerHTML = `
+          <div class="f"><label>📦 Bahan Baku / Produk Hulu <span class="req">*</span></label>
+            <select class="inp" id="tp-parents" multiple size="6" style="height:auto" data-testid="tp-parents">
+              ${opts}
+            </select>
+            <div style="font-size:11px;color:var(--t3);margin-top:4px">Tahan Ctrl/⌘ untuk pilih lebih dari satu. Wajib minimal 1 bahan baku.</div>
+          </div>`;
+      }
+    }
+    renderTraceSection();
+    document.getElementById('tp-kategori').onchange = renderTraceSection;
+
+    document.getElementById('tp-close').onclick = ()=> ov.remove();
+    document.getElementById('tp-cancel').onclick = ()=> ov.remove();
+    document.getElementById('tp-save').onclick = async()=>{
+      const kategori = document.getElementById('tp-kategori').value;
+      const payload = {
+        kode: document.getElementById('tp-kode').value.trim(),
+        nama: document.getElementById('tp-nama').value.trim(),
+        kategori,
+        jenis: document.getElementById('tp-jenis').value.trim(),
+        produsen: document.getElementById('tp-produsen').value.trim(),
+        jumlah: parseFloat(document.getElementById('tp-jumlah').value||'0'),
+        satuan: document.getElementById('tp-satuan').value.trim() || 'ton',
+        batch_date: document.getElementById('tp-batch').value || null,
+        harga: parseFloat(document.getElementById('tp-harga').value)||null,
+        lokasi_gudang: document.getElementById('tp-gudang').value.trim()||null,
+        deskripsi: document.getElementById('tp-deskripsi').value.trim()||null,
+        spesifikasi: document.getElementById('tp-spek').value.trim()||null,
+        tersedia_marketplace: document.getElementById('tp-mkt').checked,
+      };
+      if (kategori === 'Hulu'){
+        payload.plot_id = document.getElementById('tp-plot').value || null;
+        payload.parent_ids = [];
+      } else {
+        const sel = document.getElementById('tp-parents');
+        payload.parent_ids = Array.from(sel.selectedOptions).map(o=>o.value);
+        payload.plot_id = null;
+      }
+      if (!payload.kode || !payload.nama || !payload.jenis || !payload.produsen){
+        document.getElementById('tp-msg').textContent = '⚠️ Isi semua field bertanda *';
+        document.getElementById('tp-msg').style.color = 'var(--r)';
+        return;
+      }
+      try{
+        const created = await api('/products', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        notify('✅ Produk berhasil disimpan: '+created.nama);
+        ov.remove();
+        await loadProducts();
+        if (cPage === 'produk-trace') window.rProdukTrace(document.getElementById('main-page'), document.getElementById('tb-title'));
+        if (cPage === 'marketplace') window.rMarketplace(document.getElementById('main-page'), document.getElementById('tb-title'));
+      } catch(e){
+        let msg = e.message;
+        try{
+          const r = await fetch(API + '/products', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          const j = await r.json();
+          if (j.detail) msg = j.detail;
+        }catch(_){}
+        document.getElementById('tp-msg').textContent = '❌ '+msg;
+        document.getElementById('tp-msg').style.color = 'var(--r)';
+      }
+    };
+  }
+
+  /* Patch rProdukTrace to add "Tambah Produk" button for supplier roles + clickable rows */
+  const _origRProdukTrace = window.rProdukTrace;
+  window.rProdukTrace = function(pg, tl){
+    _origRProdukTrace(pg, tl);
+    const isSupplier = (typeof cRole !== 'undefined') && SUPPLIER_ROLES.includes(cRole);
+    if (isSupplier){
+      const header = pg.querySelector('.page-header');
+      if (header && !header.querySelector('.btn-tambah-produk')){
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-g btn-tambah-produk';
+        btn.setAttribute('data-testid','btn-tambah-produk');
+        btn.innerHTML = '+ Tambah Produk Baru';
+        btn.style.cssText = 'position:absolute;right:0;top:0';
+        header.style.position = 'relative';
+        btn.onclick = ()=> openTambahProdukModal();
+        header.appendChild(btn);
+      }
+    }
+    // Make product table rows clickable for detail view
+    setTimeout(()=>{
+      pg.querySelectorAll('#prod-tbody tr').forEach(tr=>{
+        const traceBtn = tr.querySelector('[data-trace]');
+        if (!traceBtn) return;
+        const pid = traceBtn.dataset.trace;
+        tr.style.cursor = 'pointer';
+        tr.querySelectorAll('td').forEach((td, idx)=>{
+          if (idx === tr.children.length - 1) return; // skip last col (trace button)
+          td.onclick = ()=>{ State.prevPage = 'produk-trace'; openProductDetail(pid); };
+        });
+      });
+    }, 50);
+  };
+
   function patchRenderPage(){
     if (typeof renderPage !== 'function') return;
     const original = renderPage;
@@ -10683,6 +11031,15 @@ document.addEventListener('DOMContentLoaded',()=>{
           pg.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="font-size:32px">⚠️</div><div>Gagal memuat produk: '+e.message+'</div></div>';
         });
         return;
+      }
+      if (page === 'marketplace'){
+        loadProducts().then(()=> window.rMarketplace(pg, tl)).catch(e=>{
+          pg.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--r)">⚠️ '+e.message+'</div>';
+        });
+        return;
+      }
+      if (page === 'produk-detail'){
+        return window.rProdukDetail(pg, tl);
       }
       return original(page);
     };
