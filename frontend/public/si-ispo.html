@@ -10714,10 +10714,19 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
     grid.innerHTML = list.map(p => {
       const c = KAT_COLORS[p.kategori]||{bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+      const ispoBadge = p.ispo_certified ? '<span style="background:rgba(22,163,74,.95);color:#fff;padding:3px 7px;border-radius:5px;font-size:9.5px;font-weight:700">✓ ISPO</span>' : '';
+      const halalBadge = p.halal_certified ? '<span style="background:rgba(5,150,105,.95);color:#fff;padding:3px 7px;border-radius:5px;font-size:9.5px;font-weight:700">☪ HALAL</span>' : '';
+      const stockBadge = p.siap_jual==='Habis' ? '<span style="background:rgba(220,38,38,.95);color:#fff;padding:3px 7px;border-radius:5px;font-size:9.5px;font-weight:700">HABIS</span>' :
+                         p.siap_jual==='Reserved' ? '<span style="background:rgba(217,119,6,.95);color:#fff;padding:3px 7px;border-radius:5px;font-size:9.5px;font-weight:700">RESERVED</span>' : '';
       return `<div class="mkt-card" data-id="${p.id}" data-testid="mkt-card-${p.kode}" style="background:#fff;border:1px solid var(--bd);border-radius:12px;overflow:hidden;cursor:pointer;transition:all .2s;box-shadow:var(--shadow);display:flex;flex-direction:column">
         <div style="height:140px;background:linear-gradient(135deg,${c.bg},#fff);display:flex;align-items:center;justify-content:center;position:relative;font-size:54px">
           ${c.ic}
-          <div style="position:absolute;top:8px;left:8px;background:rgba(22,163,74,.95);color:#fff;padding:4px 9px;border-radius:6px;font-size:10px;font-weight:700">✓ HULU→HILIR TRACKED</div>
+          <div style="position:absolute;top:8px;left:8px;display:flex;gap:4px;flex-wrap:wrap;max-width:60%">
+            <div style="background:rgba(22,163,74,.95);color:#fff;padding:3px 7px;border-radius:5px;font-size:9.5px;font-weight:700">✓ TRACKED</div>
+            ${ispoBadge}
+            ${halalBadge}
+            ${stockBadge}
+          </div>
           <div style="position:absolute;top:8px;right:8px"><span class="badge" style="background:${c.bg};color:${c.fg}">${p.kategori}</span></div>
         </div>
         <div style="padding:12px 14px;flex:1;display:flex;flex-direction:column">
@@ -10770,10 +10779,14 @@ document.addEventListener('DOMContentLoaded',()=>{
       <button class="btn btn-ghost btn-sm" id="pd-back" style="margin-bottom:12px" data-testid="pd-back">← Kembali</button>
       <div style="display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start" id="pd-grid">
         <div>
-          <div class="card" style="padding:0;overflow:hidden">
+          <div class="card" style="padding:0;overflow:hidden;margin-bottom:12px">
             <div style="height:240px;background:linear-gradient(135deg,${c.bg},#fff);display:flex;align-items:center;justify-content:center;font-size:96px;position:relative">
               ${c.ic}
-              ${inMkt?'<div style="position:absolute;top:10px;left:10px;background:rgba(22,163,74,.95);color:#fff;padding:5px 10px;border-radius:6px;font-size:10.5px;font-weight:700">✓ HULU→HILIR TRACKED</div>':''}
+              <div style="position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:5px">
+                ${inMkt?'<div style="background:rgba(22,163,74,.95);color:#fff;padding:5px 10px;border-radius:6px;font-size:10.5px;font-weight:700">✓ HULU→HILIR TRACKED</div>':''}
+                ${product.ispo_certified?`<div style="background:rgba(22,163,74,.95);color:#fff;padding:5px 10px;border-radius:6px;font-size:10.5px;font-weight:700">✓ ISPO BERSERTIFIKAT</div>`:''}
+                ${product.halal_certified?'<div style="background:rgba(5,150,105,.95);color:#fff;padding:5px 10px;border-radius:6px;font-size:10.5px;font-weight:700">☪ HALAL MUI</div>':''}
+              </div>
             </div>
             <div style="padding:18px">
               <div style="display:flex;justify-content:space-between;align-items:start;gap:6px;margin-bottom:6px">
@@ -10782,17 +10795,31 @@ document.addEventListener('DOMContentLoaded',()=>{
               </div>
               <h2 style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:4px">${product.nama}</h2>
               <div style="font-size:13px;color:var(--t2)">${product.jenis}</div>
+              ${product.sertifikat_ispo?`<div style="margin-top:8px;padding:6px 10px;background:var(--gs);border-left:3px solid #16A34A;border-radius:4px;font-size:11.5px"><span style="color:var(--t3)">Sertifikat ISPO:</span> <span style="font-family:monospace;color:#16A34A;font-weight:700">${product.sertifikat_ispo}</span></div>`:''}
               <div class="divider"></div>
               <div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Harga</div>
               <div style="font-size:22px;font-weight:800;color:var(--g)">${fmtRp(product.harga, product.satuan)}</div>
               ${product.minimum_order?`<div style="font-size:11.5px;color:var(--t2);margin-top:2px">Min order: ${product.minimum_order.toLocaleString('id-ID')} ${product.satuan}</div>`:''}
+              <div style="margin-top:6px"><span class="badge ${product.siap_jual==='Siap Jual'?'b-g':product.siap_jual==='Habis'?'b-r':'b-a'}">${product.siap_jual==='Siap Jual'?'✓ Siap Jual':product.siap_jual==='Habis'?'⊘ Habis':product.siap_jual}</span></div>
               <div class="divider"></div>
               <div style="font-size:12px;color:var(--t2);margin-bottom:4px">🏢 <b style="color:var(--t1)">${product.produsen}</b></div>
               ${product.lokasi_gudang?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">📍 ${product.lokasi_gudang}</div>`:''}
               ${product.batch_date?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">📅 Batch: ${product.batch_date}</div>`:''}
               <div style="font-size:12px;color:var(--t2);margin-bottom:4px">📦 Stok: ${product.jumlah.toLocaleString('id-ID')} ${product.satuan}</div>
-              ${inMkt?`<button class="btn btn-g" style="width:100%;justify-content:center;margin-top:14px" data-testid="btn-buy">🛒 Request Quote</button>`:''}
+              ${inMkt && product.siap_jual==='Siap Jual'?`<button class="btn btn-g" style="width:100%;justify-content:center;margin-top:14px" data-testid="btn-buy">🛒 Request Quote</button>`:''}
             </div>
+          </div>
+
+          <!-- QR Code Card -->
+          <div class="card" style="text-align:center">
+            <div class="card-title" style="justify-content:center">📱 QR Code Traceability</div>
+            <div style="font-size:11.5px;color:var(--t2);margin-bottom:10px">Scan QR ini untuk lihat asal-usul produk dari TBS sampai ke kebun asal — bisa di-cetak ke kemasan</div>
+            <div id="pd-qr" style="display:flex;justify-content:center;padding:8px;background:#fff;border-radius:8px"></div>
+            <div style="margin-top:10px;display:flex;gap:6px;justify-content:center">
+              <button class="btn btn-out btn-sm" id="qr-copy" data-testid="qr-copy">📋 Copy Link</button>
+              <button class="btn btn-out btn-sm" id="qr-download" data-testid="qr-download">⬇️ Download PNG</button>
+            </div>
+            <div id="qr-link" style="font-family:monospace;font-size:10px;color:var(--t3);margin-top:8px;word-break:break-all;padding:6px;background:var(--gl);border-radius:4px"></div>
           </div>
         </div>
         <div>
@@ -10815,13 +10842,52 @@ document.addEventListener('DOMContentLoaded',()=>{
       </div>
     `;
     document.getElementById('pd-back').onclick = ()=>{
-      // go back to previous page in nav history (default to produk-trace)
+      if (State.publicMode){
+        // strip ?trace= from URL and go back to login
+        history.replaceState({}, '', location.pathname);
+        location.reload();
+        return;
+      }
       const back = State.prevPage || 'produk-trace';
       nav(back);
     };
     const buyBtn = document.querySelector('[data-testid="btn-buy"]');
     if (buyBtn) buyBtn.onclick = ()=> notify('💬 Permintaan quote dikirim ke '+product.produsen);
     renderTraceTree(trace, document.getElementById('pd-trace'));
+
+    // Generate QR code
+    const traceURL = location.origin + location.pathname + '?trace=' + product.id;
+    document.getElementById('qr-link').textContent = traceURL;
+    const qrContainer = document.getElementById('pd-qr');
+    try {
+      new QRCode(qrContainer, {
+        text: traceURL,
+        width: 180,
+        height: 180,
+        colorDark: '#1A5C1A',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch(e){
+      qrContainer.innerHTML = '<div style="color:var(--r);font-size:11px">⚠ QR library not loaded</div>';
+    }
+    document.getElementById('qr-copy').onclick = ()=>{
+      navigator.clipboard.writeText(traceURL).then(()=> notify('📋 Link tracking disalin')).catch(()=>{
+        const ta = document.createElement('textarea'); ta.value = traceURL;
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        notify('📋 Link tracking disalin');
+      });
+    };
+    document.getElementById('qr-download').onclick = ()=>{
+      const img = qrContainer.querySelector('img') || qrContainer.querySelector('canvas');
+      if (!img) { notify('⚠️ QR belum siap'); return; }
+      const dataURL = img.tagName==='IMG' ? img.src : img.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataURL;
+      a.download = `qr-trace-${product.kode}.png`;
+      a.click();
+      notify('⬇️ QR Code didownload');
+    };
   };
 
   /* ── TAMBAH PRODUK BARU (untuk supplier roles) ── */
@@ -11053,6 +11119,55 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Prefetch data
     loadPlots().catch(()=>{});
     loadProducts().catch(()=>{});
+
+    // PUBLIC TRACE MODE: if URL has ?trace=<productId>, bypass login & show product detail
+    const params = new URLSearchParams(location.search);
+    const traceId = params.get('trace');
+    if (traceId){
+      State.publicMode = true;
+      State.currentProductId = traceId;
+      // Wait for the app shell to be ready, then render in a minimal public view
+      setTimeout(()=> renderPublicTraceView(traceId), 200);
+    }
+  }
+
+  function renderPublicTraceView(productId){
+    // Hide login form & app shell — show our own public container instead
+    const login = document.getElementById('login-form');
+    const appShell = document.getElementById('app-shell') || document.querySelector('.app-shell');
+    if (login) login.style.display = 'none';
+    if (appShell) appShell.style.display = 'none';
+    // hide other shells
+    document.querySelectorAll('.shell,.login-wrap,[data-shell]').forEach(el => el.style.display = 'none');
+
+    let pubEl = document.getElementById('public-trace-shell');
+    if (!pubEl){
+      pubEl = document.createElement('div');
+      pubEl.id = 'public-trace-shell';
+      pubEl.style.cssText = 'position:fixed;inset:0;background:var(--gl);overflow:auto;z-index:10000';
+      document.body.appendChild(pubEl);
+    }
+    pubEl.innerHTML = `
+      <div style="background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(0,0,0,.15)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="font-size:26px">🌴</div>
+          <div>
+            <div style="font-size:16px;font-weight:800">SI-ISPO Public Trace</div>
+            <div style="font-size:11.5px;opacity:.85">Verifikasi rantai pasok sawit ISPO — transparan dari TBS sampai produk akhir</div>
+          </div>
+        </div>
+        <a href="${location.pathname}" style="background:rgba(255,255,255,.15);color:#fff;text-decoration:none;padding:8px 14px;border-radius:6px;font-size:12px;font-weight:600">🔓 Login ke Sistem</a>
+      </div>
+      <div style="max-width:1200px;margin:24px auto;padding:0 20px">
+        <div id="tb-title" style="display:none"></div>
+        <div id="main-page" style="background:transparent"></div>
+      </div>
+      <div style="text-align:center;padding:24px;color:var(--t3);font-size:11px">© SI-ISPO • Sistem Informasi Indonesian Sustainable Palm Oil</div>
+    `;
+    // Render the product detail in this public container
+    const pg = pubEl.querySelector('#main-page');
+    const tl = pubEl.querySelector('#tb-title');
+    window.rProdukDetail(pg, tl);
   }
 
   if (document.readyState === 'loading') {

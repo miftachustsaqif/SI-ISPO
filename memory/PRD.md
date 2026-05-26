@@ -93,3 +93,24 @@ New features are **injected** into the existing mockup HTML via a single appende
 - All roles (incl. buyer/auditor/reviewer) can browse Marketplace & view Product Detail
 - Only supplier roles see "+ Tambah Produk Baru" button on Produk page
 - Super Admin nav now includes Marketplace ISPO too
+
+## Update — QR Code + Big Seed + ISPO Certification
+### Added
+- **QR Code generator** per produk di Product Detail page (pakai `qrcodejs` lib yang sudah ada di mockup). Hijau ISPO color (#1A5C1A), tombol Copy Link & Download PNG. QR encode URL `/si-ispo.html?trace=<product_id>`.
+- **Public Trace mode** — buka `/si-ispo.html?trace=<product_id>` langsung tanpa login. Header hijau khusus, tombol "Login ke Sistem". Cocok untuk konsumen yang scan QR di kemasan produk fisik (buyer EU EUDR compliance scenarios).
+- **Massive seed expansion**: dari 22 → **58 produk** terdistribusi:
+  - Hulu (TBS): 8 batch dari 5 kebun (multiple panen periods)
+  - Rafinasi: 16 (CPO ×7, PKO ×2, PKC ×1, RBD ×2, Olein ×2, Stearin ×2)
+  - Pangan: 12 (Minyak Goreng 3 brand × multi-size, Margarin ×2, Shortening, Specialty Fats ×2, Pakan Ternak ×2)
+  - Oleokimia: 14 (Fatty Acid ×2, Gliserol ×2, ME ×2, Sabun ×2, Deterjen ×2, Kosmetik ×4)
+  - Bioenergi: 8 (Biodiesel B30/B40/B100, Biomassa PKS/EFB/Mesocarp Fiber, Biogas ×2 plant)
+- **Certification fields**: `ispo_certified`, `sertifikat_ispo` (No. ISPO/CERT/2024/XXXX), `halal_certified`, `siap_jual` (Siap Jual/Habis/Reserved/Draft).
+- **Marketplace cards** show: ✓ TRACKED, ✓ ISPO, ☪ HALAL, HABIS/RESERVED badges + kategori.
+- **Product Detail badges**: ✓ HULU→HILIR TRACKED, ✓ ISPO BERSERTIFIKAT (with cert number ISPO/CERT/2024/XXXX), ☪ HALAL MUI, status Siap Jual/Habis/Reserved.
+
+### Stats (after big seed)
+- 58 products • 51 marketplace-listed • 55 ISPO-certified • 51 Siap Jual
+- 5 plots • 11 users • Full hulu→hilir chains for Minyak Goreng/Margarin/Sabun/Biodiesel/Kosmetik
+
+### Public Trace URL format
+`https://<host>/si-ispo.html?trace=<product_id>` — printable QR code, no auth required.
