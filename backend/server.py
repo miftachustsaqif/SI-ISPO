@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 ROOT_DIR = Path(__file__).parent
@@ -259,6 +259,38 @@ class RoleUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class Order(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nomor: str
+    buyer_email: str
+    buyer_nama: str
+    supplier: str
+    product_id: str
+    product_kode: str
+    product_nama: str
+    qty: float
+    satuan: str
+    harga_per_unit: float
+    harga_total: float
+    status: str = "Pending"  # Pending, Dikonfirmasi, Dikirim, Diterima, Selesai, Dibatalkan
+    tgl_pesan: str
+    tgl_kirim: Optional[str] = None
+    tgl_terima: Optional[str] = None
+    catatan: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OrderCreate(BaseModel):
+    nomor: Optional[str] = None
+    buyer_email: str
+    buyer_nama: str
+    supplier: str
+    product_id: str
+    qty: float
+    catatan: Optional[str] = None
 
 
 # ─────────── Routes ───────────
@@ -656,7 +688,75 @@ async def seed_demo():
         "ok": True,
         "plots": len(plots_data),
         "products": await db.products.count_documents({}),
+        "orders": await _seed_orders_inline(),
     }
+
+
+async def _seed_orders_inline():
+    """Inline helper used by /seed to also create order history."""
+    await db.orders.delete_many({})
+    buyers = [
+        {"email": "buyer@test.com", "nama": "Global Oils Trading Ltd."},
+        {"email": "buyer.eu@example.com", "nama": "EuroPalm Importers GmbH"},
+        {"email": "buyer.id@example.com", "nama": "PT Distribusi Nusantara"},
+        {"email": "buyer.jp@example.com", "nama": "Sakura Trading Co. Ltd."},
+        {"email": "buyer.in@example.com", "nama": "Mumbai Oils Pvt. Ltd."},
+        {"email": "retailer@example.com", "nama": "PT Indomart Retail"},
+        {"email": "hotel@example.com", "nama": "Hotel Group Indonesia"},
+        {"email": "industri@example.com", "nama": "PT Industri Pangan Sehat"},
+    ]
+    products = await db.products.find(
+        {"tersedia_marketplace": True, "siap_jual": "Siap Jual"}, {"_id": 0}
+    ).to_list(500)
+    if not products:
+        return 0
+    import random
+    random.seed(42)
+    statuses = ["Pending", "Dikonfirmasi", "Dikirim", "Diterima", "Selesai", "Selesai", "Selesai"]
+    catatan_options = [
+        "Pengiriman urgent untuk Lebaran",
+        "Kirim ke gudang utama Jakarta",
+        "Untuk distribusi retail Jabodetabek",
+        "Persiapan stok ramadhan",
+        "Ekspor ke pasar Eropa, EUDR compliant",
+        "Order rutin bulanan",
+        "Trial sample untuk Q2",
+        None, None, None,
+    ]
+    n = 0
+    while n < 32:
+        buyer = random.choice(buyers)
+        product = random.choice(products)
+        min_o = float(product.get("minimum_order") or 1)
+        qty = round(min_o * random.uniform(1.0, 8.0), 0)
+        harga = float(product.get("harga") or 0)
+        status = random.choice(statuses)
+        days_ago = random.randint(1, 90)
+        tgl_pesan_dt = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        tgl_pesan = tgl_pesan_dt.strftime("%Y-%m-%d")
+        order = {
+            "id": str(uuid.uuid4()),
+            "nomor": f"ORD-2025-{(n+1):04d}",
+            "buyer_email": buyer["email"],
+            "buyer_nama": buyer["nama"],
+            "supplier": product["produsen"],
+            "product_id": product["id"],
+            "product_kode": product["kode"],
+            "product_nama": product["nama"],
+            "qty": qty,
+            "satuan": product.get("satuan", "pcs"),
+            "harga_per_unit": harga,
+            "harga_total": harga * qty,
+            "status": status,
+            "tgl_pesan": tgl_pesan,
+            "tgl_kirim": (tgl_pesan_dt + timedelta(days=random.randint(2, 7))).strftime("%Y-%m-%d") if status in ("Dikirim", "Diterima", "Selesai") else None,
+            "tgl_terima": (tgl_pesan_dt + timedelta(days=random.randint(5, 14))).strftime("%Y-%m-%d") if status in ("Diterima", "Selesai") else None,
+            "catatan": random.choice(catatan_options),
+            "created_at": tgl_pesan_dt.isoformat(),
+        }
+        await db.orders.insert_one(order)
+        n += 1
+    return n
 
 
 # ─────────── Users / Roles management (Super Admin) ───────────
@@ -784,6 +884,159 @@ async def admin_overview():
         "companies": companies_total,
         "documents": documents_total,
     }
+
+
+# ─────────── Orders (B2B marketplace orders) ───────────
+@api_router.get("/orders", response_model=List[Order])
+async def list_orders(buyer_email: Optional[str] = None, supplier: Optional[str] = None,
+                       status: Optional[str] = None):
+    q: Dict[str, Any] = {}
+    if buyer_email:
+        q["buyer_email"] = buyer_email
+    if supplier:
+        q["supplier"] = supplier
+    if status:
+        q["status"] = status
+    items = await db.orders.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for o in items:
+        if isinstance(o.get("created_at"), str):
+            o["created_at"] = datetime.fromisoformat(o["created_at"])
+    return items
+
+
+@api_router.get("/orders/{order_id}", response_model=Order)
+async def get_order(order_id: str):
+    doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if isinstance(doc.get("created_at"), str):
+        doc["created_at"] = datetime.fromisoformat(doc["created_at"])
+    return doc
+
+
+@api_router.post("/orders", response_model=Order)
+async def create_order(payload: OrderCreate):
+    prod = await db.products.find_one({"id": payload.product_id}, {"_id": 0})
+    if not prod:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if payload.qty <= 0:
+        raise HTTPException(status_code=400, detail="qty must be > 0")
+    harga = float(prod.get("harga") or 0)
+    obj = Order(
+        nomor=payload.nomor or f"ORD-{uuid.uuid4().hex[:8].upper()}",
+        buyer_email=payload.buyer_email,
+        buyer_nama=payload.buyer_nama,
+        supplier=payload.supplier,
+        product_id=payload.product_id,
+        product_kode=prod["kode"],
+        product_nama=prod["nama"],
+        qty=payload.qty,
+        satuan=prod.get("satuan", "pcs"),
+        harga_per_unit=harga,
+        harga_total=harga * payload.qty,
+        status="Pending",
+        tgl_pesan=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        catatan=payload.catatan,
+    )
+    doc = obj.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.orders.insert_one(doc)
+    return obj
+
+
+@api_router.put("/orders/{order_id}/status", response_model=Order)
+async def update_order_status(order_id: str, payload: StatusUpdate):
+    valid = ["Pending", "Dikonfirmasi", "Dikirim", "Diterima", "Selesai", "Dibatalkan"]
+    if payload.status not in valid:
+        raise HTTPException(status_code=400, detail=f"status must be one of {valid}")
+    update = {"status": payload.status}
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if payload.status == "Dikirim":
+        update["tgl_kirim"] = today
+    elif payload.status in ("Diterima", "Selesai"):
+        update["tgl_terima"] = today
+    result = await db.orders.find_one_and_update(
+        {"id": order_id}, {"$set": update},
+        return_document=True, projection={"_id": 0}
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if isinstance(result.get("created_at"), str):
+        result["created_at"] = datetime.fromisoformat(result["created_at"])
+    return result
+
+
+@api_router.post("/seed-orders")
+async def seed_orders():
+    """Seed B2B order history showing 'produk mana jalan kemana'."""
+    await db.orders.delete_many({})
+    buyers = [
+        {"email": "buyer@test.com", "nama": "Global Oils Trading Ltd."},
+        {"email": "buyer.eu@example.com", "nama": "EuroPalm Importers GmbH"},
+        {"email": "buyer.id@example.com", "nama": "PT Distribusi Nusantara"},
+        {"email": "buyer.jp@example.com", "nama": "Sakura Trading Co. Ltd."},
+        {"email": "buyer.in@example.com", "nama": "Mumbai Oils Pvt. Ltd."},
+        {"email": "retailer@example.com", "nama": "PT Indomart Retail"},
+        {"email": "hotel@example.com", "nama": "Hotel Group Indonesia"},
+        {"email": "industri@example.com", "nama": "PT Industri Pangan Sehat"},
+    ]
+    # Get available marketplace products
+    products = await db.products.find(
+        {"tersedia_marketplace": True, "siap_jual": "Siap Jual"}, {"_id": 0}
+    ).to_list(500)
+    if not products:
+        return {"ok": False, "error": "No marketplace products available. Run /api/seed first."}
+
+    import random
+    random.seed(42)
+    statuses = ["Pending", "Dikonfirmasi", "Dikirim", "Diterima", "Selesai", "Selesai", "Selesai"]
+    catatan_options = [
+        "Pengiriman urgent untuk Lebaran",
+        "Kirim ke gudang utama Jakarta",
+        "Untuk distribusi retail Jabodetabek",
+        "Persiapan stok ramadhan",
+        "Ekspor ke pasar Eropa, EUDR compliant",
+        "Order rutin bulanan",
+        "Trial sample untuk Q2",
+        None, None, None,
+    ]
+    orders_to_create = 32
+    n = 0
+    while n < orders_to_create:
+        buyer = random.choice(buyers)
+        product = random.choice(products)
+        # qty based on min_order
+        min_o = float(product.get("minimum_order") or 1)
+        qty = round(min_o * random.uniform(1.0, 8.0), 0)
+        harga = float(product.get("harga") or 0)
+        status = random.choice(statuses)
+        days_ago = random.randint(1, 90)
+        tgl_pesan_dt = datetime.now(timezone.utc) - timedelta(days=days_ago)
+        tgl_pesan = tgl_pesan_dt.strftime("%Y-%m-%d")
+        order = {
+            "id": str(uuid.uuid4()),
+            "nomor": f"ORD-2025-{(n+1):04d}",
+            "buyer_email": buyer["email"],
+            "buyer_nama": buyer["nama"],
+            "supplier": product["produsen"],
+            "product_id": product["id"],
+            "product_kode": product["kode"],
+            "product_nama": product["nama"],
+            "qty": qty,
+            "satuan": product.get("satuan", "pcs"),
+            "harga_per_unit": harga,
+            "harga_total": harga * qty,
+            "status": status,
+            "tgl_pesan": tgl_pesan,
+            "tgl_kirim": (tgl_pesan_dt + timedelta(days=random.randint(2, 7))).strftime("%Y-%m-%d") if status in ("Dikirim", "Diterima", "Selesai") else None,
+            "tgl_terima": (tgl_pesan_dt + timedelta(days=random.randint(5, 14))).strftime("%Y-%m-%d") if status in ("Diterima", "Selesai") else None,
+            "catatan": random.choice(catatan_options),
+            "created_at": tgl_pesan_dt.isoformat(),
+        }
+        await db.orders.insert_one(order)
+        n += 1
+
+    return {"ok": True, "orders_created": n}
 
 
 app.include_router(api_router)

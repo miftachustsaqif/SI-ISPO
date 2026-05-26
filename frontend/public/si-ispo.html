@@ -9833,6 +9833,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           {id:'pemetaan-lahan',    label:'Pemetaan Lahan',        icon:'🗺️'},
           {id:'produk-trace',      label:'Produk & Traceability', icon:'🔗'},
           {id:'marketplace',       label:'Marketplace ISPO',      icon:'🛒'},
+          {id:'admin-orders',      label:'Semua Pesanan',         icon:'📦'},
           {id:'admin-certificates',label:'Semua Sertifikat',      icon:'🏆'},
           {id:'admin-audits',      label:'Semua Audit',           icon:'🔍'},
           {id:'admin-companies',   label:'Semua Perusahaan',      icon:'🏢'},
@@ -9844,13 +9845,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     const lahanItem = {id:'pemetaan-lahan', label:'Pemetaan Lahan', icon:'🗺️'};
     const traceItem = {id:'produk-trace',   label:'Produk & Traceability', icon:'🔗'};
     const mktItem   = {id:'marketplace',    label:'Marketplace ISPO', icon:'🛒'};
+    const ordersItem = {id:'pesanan-saya',  label:'Pesanan Saya', icon:'📦'};
     const targets = {
       ls:           [lahanItem, traceItem, mktItem],
       pekebun:      [lahanItem, traceItem, mktItem],
       pks:          [lahanItem, traceItem, mktItem],
       perkebunan:   [lahanItem, traceItem, mktItem],
       bioenergy:    [traceItem, mktItem],
-      buyer:        [traceItem, mktItem],
+      buyer:        [traceItem, mktItem, ordersItem],
       auditor:      [lahanItem],
       auditor_int:  [lahanItem],
     };
@@ -11073,6 +11075,126 @@ document.addEventListener('DOMContentLoaded',()=>{
     }, 50);
   };
 
+  /* ================================================================
+     PESANAN — Order list for Buyer / Admin
+     ================================================================ */
+  const ORDER_STATUS_CLR = {
+    'Pending':      {bg:'#FEF3C7', fg:'#92400E', ic:'⏳'},
+    'Dikonfirmasi': {bg:'#DBEAFE', fg:'#1E40AF', ic:'✓'},
+    'Dikirim':      {bg:'#E0E7FF', fg:'#3730A3', ic:'🚛'},
+    'Diterima':     {bg:'#D1FAE5', fg:'#065F46', ic:'📦'},
+    'Selesai':      {bg:'#DCFCE7', fg:'#15803D', ic:'✓✓'},
+    'Dibatalkan':   {bg:'#FEE2E2', fg:'#991B1B', ic:'✕'},
+  };
+
+  function buyerEmailForRole(){
+    if (typeof cRole === 'undefined') return null;
+    if (cRole === 'superadmin') return null;
+    if (cRole === 'buyer') return 'buyer@test.com';
+    return null;
+  }
+
+  window.rPesananSaya = async function(pg, tl){
+    tl.textContent = '🛒 Pesanan Saya';
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🛒 Pesanan Saya</h1>
+        <p>Riwayat order produk ISPO yang Anda pesan. Klik "🔍 Detail + Trace" untuk lihat asal-usul produk lengkap dengan QR code.</p>
+      </div>
+      <div id="orders-stats" class="stats-row"></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+        <select class="inp" id="ord-status-filter" style="max-width:200px" data-testid="ord-status-filter">
+          <option value="">Semua Status</option>
+          ${Object.keys(ORDER_STATUS_CLR).map(s=>`<option value="${s}">${ORDER_STATUS_CLR[s].ic} ${s}</option>`).join('')}
+        </select>
+        <input class="inp" id="ord-search" placeholder="🔍 Cari nomor order, produk, supplier..." style="flex:1;max-width:400px" data-testid="ord-search">
+      </div>
+      <div id="orders-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    `;
+    const email = buyerEmailForRole();
+    const url = email ? `/orders?buyer_email=${encodeURIComponent(email)}` : '/orders';
+    let orders = [];
+    try{ orders = await api(url); }
+    catch(e){ document.getElementById('orders-list').innerHTML = '<div class="card" style="color:var(--r)">❌ '+e.message+'</div>'; return; }
+
+    State.orders = orders;
+
+    const renderStats = ()=>{
+      const total = orders.length;
+      const aktif = orders.filter(o => !['Selesai','Dibatalkan'].includes(o.status)).length;
+      const selesai = orders.filter(o => o.status === 'Selesai').length;
+      const total_value = orders.reduce((s,o)=>s+(o.harga_total||0), 0);
+      const el = document.getElementById('orders-stats');
+      el.innerHTML = `
+        <div class="stat-card"><div class="sc-icon" style="background:var(--gs);color:#16A34A">📦</div><div class="sc-label">Total Pesanan</div><div class="sc-val">${total}</div><div class="sc-change">Sepanjang waktu</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:#DBEAFE;color:#1E40AF">🚛</div><div class="sc-label">Sedang Proses</div><div class="sc-val">${aktif}</div><div class="sc-change">Pending → Dikirim</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:#DCFCE7;color:#15803D">✓</div><div class="sc-label">Selesai</div><div class="sc-val">${selesai}</div><div class="sc-change">${total?Math.round(selesai/total*100):0}% completion rate</div></div>
+        <div class="stat-card"><div class="sc-icon" style="background:var(--al);color:var(--a)">💰</div><div class="sc-label">Total Nilai</div><div class="sc-val" style="font-size:18px">${fmtRp(total_value)}</div><div class="sc-change">Semua pesanan</div></div>
+      `;
+    };
+
+    const renderList = ()=>{
+      const s = (document.getElementById('ord-status-filter').value||'');
+      const q = (document.getElementById('ord-search').value||'').toLowerCase();
+      let list = orders;
+      if (s) list = list.filter(o => o.status === s);
+      if (q) list = list.filter(o => (o.nomor+o.product_kode+o.product_nama+o.supplier+o.buyer_nama).toLowerCase().includes(q));
+      const el = document.getElementById('orders-list');
+      if (!list.length){ el.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--t3)">Tidak ada pesanan</div>'; return; }
+      el.innerHTML = list.map(o => {
+        const sc = ORDER_STATUS_CLR[o.status] || {bg:'#F3F4F6',fg:'#374151',ic:'•'};
+        const showBuyer = (typeof cRole !== 'undefined') && cRole === 'superadmin';
+        return `<div class="card" style="padding:0;overflow:hidden;border-left:4px solid ${sc.fg}">
+          <div style="display:grid;grid-template-columns:1.4fr 1fr 200px;gap:14px;padding:14px 16px;align-items:center">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+                <span class="badge" style="background:${sc.bg};color:${sc.fg};font-weight:700">${sc.ic} ${o.status}</span>
+                <span style="font-family:monospace;font-size:11px;color:var(--t3)">${o.nomor}</span>
+                <span style="font-size:11px;color:var(--t3)">📅 ${o.tgl_pesan}</span>
+              </div>
+              <div style="font-size:14px;font-weight:700;color:var(--t1)">${o.product_nama}</div>
+              <div style="font-size:11.5px;color:var(--t2);margin-top:2px;font-family:monospace">${o.product_kode}</div>
+              ${showBuyer?`<div style="font-size:12px;color:var(--t2);margin-top:5px">🏪 <b>${o.buyer_nama}</b> → 🏭 ${o.supplier}</div>`:`<div style="font-size:12px;color:var(--t2);margin-top:5px">🏭 Supplier: <b style="color:var(--t1)">${o.supplier}</b></div>`}
+              ${o.catatan?`<div style="font-size:11.5px;color:var(--t3);margin-top:4px;font-style:italic">💬 ${o.catatan}</div>`:''}
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:11px;color:var(--t3);margin-bottom:2px">JUMLAH</div>
+              <div style="font-size:16px;font-weight:700;color:var(--t1)">${o.qty.toLocaleString('id-ID')} ${o.satuan}</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:6px;margin-bottom:2px">TOTAL</div>
+              <div style="font-size:15px;font-weight:800;color:var(--g)">${fmtRp(o.harga_total)}</div>
+              <div style="font-size:10.5px;color:var(--t3);margin-top:2px">@ ${fmtRp(o.harga_per_unit, o.satuan)}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <button class="btn btn-g btn-sm" data-detail-pid="${o.product_id}" data-testid="ord-detail-${o.nomor}" style="justify-content:center">🔍 Detail + Trace</button>
+              <button class="btn btn-out btn-sm" data-trace-pid="${o.product_id}" style="justify-content:center;font-size:11px">🔗 Quick Trace</button>
+              ${o.tgl_kirim?`<div style="font-size:10.5px;color:var(--t3);text-align:center;margin-top:3px">🚛 ${o.tgl_kirim}${o.tgl_terima?' → 📦 '+o.tgl_terima:''}</div>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      el.querySelectorAll('[data-detail-pid]').forEach(b => {
+        b.onclick = ()=>{ State.prevPage = cPage; openProductDetail(b.dataset.detailPid); };
+      });
+      el.querySelectorAll('[data-trace-pid]').forEach(b => {
+        b.onclick = ()=> showTraceModal(b.dataset.tracePid);
+      });
+    };
+
+    renderStats();
+    renderList();
+    document.getElementById('ord-status-filter').onchange = renderList;
+    document.getElementById('ord-search').oninput = renderList;
+  };
+
+  window.rAdminOrders = async function(pg, tl){
+    tl.textContent = '📦 Semua Pesanan (Admin)';
+    await window.rPesananSaya(pg, tl);
+    const h = pg.querySelector('.page-header h1');
+    const p = pg.querySelector('.page-header p');
+    if (h) h.textContent = '📦 Semua Pesanan — Pantau Lalu Lintas Produk Lintas Sistem';
+    if (p) p.textContent = 'Lihat semua transaksi B2B lintas sistem. Klik order untuk telusuri rantai pasok dari produk yang dipesan sampai ke kebun asal TBS.';
+  };
+
   function patchRenderPage(){
     if (typeof renderPage !== 'function') return;
     const original = renderPage;
@@ -11082,6 +11204,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       if (page === 'dashboard' && (typeof cRole !== 'undefined') && cRole === 'superadmin'){
         return window.rAdminDashboard(pg, tl);
       }
+      if (page === 'pesanan-saya')       return window.rPesananSaya(pg, tl);
+      if (page === 'admin-orders')       return window.rAdminOrders(pg, tl);
       if (page === 'admin-users')        return window.rAdminUsers(pg, tl);
       if (page === 'admin-certificates') return window.rAdminCertificates(pg, tl);
       if (page === 'admin-audits')       return window.rAdminAudits(pg, tl);

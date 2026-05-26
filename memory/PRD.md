@@ -114,3 +114,26 @@ New features are **injected** into the existing mockup HTML via a single appende
 
 ### Public Trace URL format
 `https://<host>/si-ispo.html?trace=<product_id>` — printable QR code, no auth required.
+
+## Update — Pesanan Saya + Admin Orders + Seed Orders
+### Added
+- **Pesanan Saya** page (buyer role): order history with status badges (Pending/Dikonfirmasi/Dikirim/Diterima/Selesai/Dibatalkan), search & filter, total stats (Total/Sedang Proses/Selesai/Total Nilai).
+- **Semua Pesanan** page (Super Admin): same view but shows ALL orders system-wide with buyer→supplier flow visible (🏪 → 🏭).
+- **Detail + Trace button per order** → opens the existing Product Detail page (with QR code + full hulu→hilir traceability tree to the originating kebun/TBS).
+- **Quick Trace button** → opens the inline modal traceability view.
+- **32 seed orders** across 8 international buyers (Global Oils Trading, EuroPalm Importers GmbH, Sakura Trading Co., Mumbai Oils Pvt., Hotel Group Indonesia, etc.) ordering 51 different marketplace products with realistic statuses, dates, prices, and catatan ("Pengiriman urgent untuk Lebaran", "Ekspor ke pasar Eropa EUDR compliant", "Persiapan stok ramadhan", etc.).
+
+### Backend Endpoints
+- `GET /api/orders?buyer_email=X&supplier=Y&status=Z`
+- `GET /api/orders/{id}`
+- `POST /api/orders` — validates product exists & qty>0, auto-computes harga_total
+- `PUT /api/orders/{id}/status` — auto-fills tgl_kirim/tgl_terima based on status transition
+- `POST /api/seed-orders` (standalone) — re-seed orders only
+- `/api/seed` now also seeds orders (returns `{plots, products, orders}`)
+
+### Stats (current)
+- 5 plots • 11 users • 58 products (51 marketplace) • **32 orders** (Rp 27.47 Billion total value)
+- Orders distribution: 19 Selesai, 5 Dikonfirmasi, 3 Dikirim, 3 Pending, 2 Diterima
+
+### Flow Demonstration
+Buyer click order → see product detail with **complete chain**: e.g. "EcoWash Sabun Cuci Piring (DET-002) ← Methyl Laurate (ME-002) ← PKO Riau (PKO-RIA-001) ← TBS Riau A1 (TBS-RIA-001) ← Kebun Inti Riau A1 (1250.5 ha, Tersertifikasi ISPO sejak 2012)". Admin sees same chain plus the buyer who ordered.
