@@ -171,3 +171,16 @@ Buyer click order → see product detail with **complete chain**: e.g. "EcoWash 
 
 ### Impact
 Login page and every internal dashboard page (Dashboard, Marketplace, Pesanan Saya, Traceability, Peta, Admin views) now share consistent, modern, spacious design language with the new landing page.
+
+## Update — Whitespace Overhaul v2 (Landing-Level Airy)
+### Changes
+- **Content padding**: 40x48px (was 26x32)
+- **Cards**: 30x32px padding (was 22x24), 16px radius, 22px card-title bottom margin (was 16)
+- **Stat cards**: 26x28px padding, 44px icons, 30px value font, 20px icon margin-bottom, 32px stats-row bottom-margin (was 22)
+- **Page header**: 32px bottom padding (was 22), 30px h1 (was 26), 10px h1-to-p gap
+- **Sidebar**: 260px width, 12x14px nav padding, 4px gap between items, 12x14px nb items with 3px margin
+- **Topbar**: 18x40px padding (was 14x28), 68px min-height
+- **Tables**: 16-22px header padding, 18-22px row padding (was 12-16 / 14-16)
+- **Login form**: 40px padding, single-column demo buttons with 13-16px padding, 50px Super Admin CTA, 14-18px form field spacing
+- **Grid layouts**: Force 20px gap on all `grid-template-columns` layouts
+- **Section rhythm**: 32px+ vertical space between major sections
