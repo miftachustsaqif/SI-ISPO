@@ -152,3 +152,22 @@ Buyer click order → see product detail with **complete chain**: e.g. "EcoWash 
 
 ### React entry
 - `App.js` iframe now loads `/landing.html` by default (was `/si-ispo.html`).
+
+## Update — Clean UI Overhaul for Login + Internal Pages
+### Added
+- **Comprehensive CSS override** injected at top of `si-ispo.html` — applies globally with `!important` to soften every visual layer without touching original mockup logic.
+- **Font**: Plus Jakarta Sans applied everywhere (matches landing page — was inconsistent before)
+- **Softer color tokens**: lighter borders (#EDEFED), softer shadows, muted background (#FAFBFA)
+- **Whitespace expansion**: cards 22-24px padding, page-header 26px vertical, main content 26-32px padding, stat-card 22px, form field spacing 16px
+- **Cleaner buttons**: 10px 18px padding, softer green shadow, hover lift effect
+- **Cleaner inputs**: 11-14px padding, 9px radius, green focus ring
+- **Cleaner tables**: 12-14px row padding, uppercase 11px headers, subtle hover
+- **Cleaner sidebar nav**: 10-12px padding, subtle white transparency for active/hover
+- **Cleaner topbar**: 14x28 padding, semi-transparent white with backdrop blur
+- **Login page redesign**: airy form, clean demo login button grid (2-column), highlighted Super Admin gradient CTA, larger focus ring on inputs
+- **Marketplace cards**: 14px radius, subtle lift on hover
+- **Progress bars**: softer green, 6px height
+- **Custom scrollbar**: subtle 8px grey rounded thumb
+
+### Impact
+Login page and every internal dashboard page (Dashboard, Marketplace, Pesanan Saya, Traceability, Peta, Admin views) now share consistent, modern, spacious design language with the new landing page.
