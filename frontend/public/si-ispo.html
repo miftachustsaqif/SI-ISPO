@@ -113,15 +113,82 @@
   }
   #tb-title { font-size: 16px !important; font-weight: 700 !important; letter-spacing: -.3px; color: #0F1B15 !important; }
 
-  /* ── MAIN CONTENT: airy padding like landing ── */
+  /* ── MAIN CONTENT: airy padding + max-width cap for wide screens ── */
   #main-page, .main-page, #content, .content, .app-content, .page-content {
     padding: 40px 48px 56px !important;
-    max-width: 1400px;
+    max-width: 1440px;
     margin: 0 auto;
+  }
+  @media (min-width: 1600px){
+    #main-page, .main-page, #content, .content { padding: 48px 60px 64px !important; }
   }
   @media (max-width: 1200px){
     #main-page, .main-page, #content, .content { padding: 32px 32px 48px !important; }
   }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 56px 32px;
+    background: #fff;
+    border: 1px dashed #EDEFED;
+    border-radius: 16px;
+    color: #6B7A72;
+  }
+  .empty-state .es-illustration {
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 22px;
+    background: linear-gradient(135deg, #F5F8F4, #E7F3E4);
+    border-radius: 50%;
+    color: #16A34A;
+  }
+  .empty-state .es-illustration svg { width: 60px; height: 60px; }
+  .empty-state h4 {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #0F1B15 !important;
+    margin-bottom: 8px !important;
+    letter-spacing: -.3px;
+  }
+  .empty-state p {
+    font-size: 13.5px !important;
+    color: #6B7A72 !important;
+    line-height: 1.55 !important;
+    max-width: 380px;
+    margin: 0 auto 22px;
+  }
+  .empty-state .es-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    background: #1A5C1A;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .15s;
+    box-shadow: 0 1px 2px rgba(26,92,26,.15);
+  }
+  .empty-state .es-cta:hover {
+    background: #145013;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(26,92,26,.25);
+  }
+  .empty-state .es-cta.secondary { background: #fff; color: #1A5C1A; border: 1.5px solid #1A5C1A; box-shadow: none; }
+  .empty-state .es-cta.secondary:hover { background: #F5F8F4; }
+  .empty-state .es-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
   /* ── BUTTONS ── */
   .btn {
@@ -10198,6 +10265,46 @@ document.addEventListener('DOMContentLoaded',()=>{
   /* ── Toast helper that falls back to alert ── */
   function notify(msg){ try{ toast(msg); } catch(e){ console.log(msg); } }
 
+  /* ── Empty state helper ── */
+  const ES_ICONS = {
+    box:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>',
+    cart:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1.5"/><circle cx="20" cy="21" r="1.5"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>',
+    search:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>',
+    plot:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.5-2V4L9 6l6-2 6 2v14l-6-2-6 2z"/><path d="M9 6v14"/><path d="M15 4v14"/></svg>',
+    people:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    cert:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5L17 22l-5-3-5 3 1.5-9.5"/></svg>',
+    doc:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>',
+    audit:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+    building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M6 21V3h12v18"/><path d="M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg>',
+  };
+
+  function emptyState(opts){
+    /* opts: {icon, title, subtitle, cta:{label,onClick}, cta2:{label,onClick}} */
+    const iconKey = opts.icon || 'box';
+    const iconSvg = ES_ICONS[iconKey] || ES_ICONS.box;
+    const ctas = [];
+    if (opts.cta)  ctas.push(`<button class="es-cta" data-cta="1" data-testid="${opts.testid||'es-cta'}">${opts.cta.label}</button>`);
+    if (opts.cta2) ctas.push(`<button class="es-cta secondary" data-cta="2">${opts.cta2.label}</button>`);
+    const html = `
+      <div class="empty-state" data-testid="empty-state">
+        <div class="es-illustration">${iconSvg}</div>
+        <h4>${opts.title||'Belum ada data'}</h4>
+        <p>${opts.subtitle||''}</p>
+        ${ctas.length?`<div class="es-actions">${ctas.join('')}</div>`:''}
+      </div>`;
+    // Return a helper that can attach handlers after being inserted
+    return {
+      html,
+      bind(container){
+        if (!container) return;
+        const btn1 = container.querySelector('[data-cta="1"]');
+        const btn2 = container.querySelector('[data-cta="2"]');
+        if (btn1 && opts.cta && opts.cta.onClick) btn1.onclick = opts.cta.onClick;
+        if (btn2 && opts.cta2 && opts.cta2.onClick) btn2.onclick = opts.cta2.onClick;
+      }
+    };
+  }
+
   /* ── State ── */
   const State = { plots: [], products: [], mapInstance: null, drawnLayer: null, editingPlotId: null };
 
@@ -10299,7 +10406,12 @@ document.addEventListener('DOMContentLoaded',()=>{
                 <div style="font-size:11.5px;color:var(--t3);margin-top:2px">📍 ${p.provinsi}${p.kabupaten?', '+p.kabupaten:''} • ${p.luas_ha} ha</div>
                 <div style="font-size:11px;color:var(--t3);margin-top:3px">📄 ${(p.documents||[]).length} dokumen pembuktian</div>
               </div>
-            `).join('') || '<div style="text-align:center;padding:18px;color:var(--t3);font-size:12px">Belum ada data lahan. Klik tombol "Tambah Polygon" di peta untuk menambah.</div>'}
+            `).join('') || (()=>{ window.__lahanES = emptyState({
+              icon:'plot', title:'Belum ada data lahan',
+              subtitle:'Mulai petakan lahan sawit Anda dengan menggambar polygon langsung di peta. Setiap lahan bisa dilengkapi dokumen pembuktian.',
+              cta:{label:'✏️ Tambah Polygon di Peta', onClick:()=> startDrawPolygon()},
+              testid:'lahan-empty-cta'
+            }); return window.__lahanES.html; })()}
           </div>
         </div>
       `;
@@ -10313,6 +10425,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         r.onmouseenter = ()=> r.style.background = 'var(--gl)';
         r.onmouseleave = ()=> r.style.background = '#fff';
       });
+      if (window.__lahanES) { window.__lahanES.bind(side); window.__lahanES = null; }
       return;
     }
     // detail panel
@@ -10535,18 +10648,37 @@ document.addEventListener('DOMContentLoaded',()=>{
       list = list.filter(p => (p.nama+p.kode+p.produsen+p.jenis).toLowerCase().includes(s));
     }
     document.getElementById('prod-count').textContent = list.length;
-    tbody.innerHTML = list.map(p=>{
-      const c = KAT_COLORS[p.kategori] || {bg:'#F3F4F6',fg:'#374151',ic:'📦'};
-      return `<tr>
-        <td><div class="cn" style="font-family:monospace">${p.kode}</div></td>
-        <td><div class="cn">${p.nama}</div><div class="cs">${p.jenis}</div></td>
-        <td><span class="badge" style="background:${c.bg};color:${c.fg}">${c.ic} ${p.kategori}</span></td>
-        <td>${p.produsen}</td>
-        <td>${p.jumlah.toLocaleString('id-ID')} ${p.satuan}</td>
-        <td>${p.batch_date||'-'}</td>
-        <td><button class="btn btn-out btn-sm" data-trace="${p.id}" data-testid="btn-trace-${p.kode}">🔍 Telusuri</button></td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--t3)">Tidak ada produk</td></tr>';
+    if (!list.length) {
+      const isSupplier = (typeof cRole !== 'undefined') && SUPPLIER_ROLES.includes(cRole);
+      const esOpts = q ? {
+        icon:'search', title:'Tidak ada produk yang cocok',
+        subtitle:`Tidak ada produk yang cocok dengan pencarian "${q}". Coba kata kunci lain atau reset filter.`,
+        cta:{label:'🔄 Reset Pencarian', onClick:()=>{ const s=document.getElementById('prod-search'); if(s){s.value='';renderProdTable(kat,'');} }}
+      } : (isSupplier ? {
+        icon:'box', title:'Belum ada produk',
+        subtitle:'Tambahkan produk hulu (TBS) atau produk turunan dari bahan baku yang sudah ada — semua dengan traceability wajib ke kebun asal.',
+        cta:{label:'+ Tambah Produk Baru', onClick:()=> openTambahProdukModal()}
+      } : {
+        icon:'box', title:'Belum ada produk',
+        subtitle:'Data produk akan muncul di sini saat penyedia menambahkan produk baru dengan traceability lengkap.'
+      });
+      const es = emptyState(esOpts);
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:0"><div style="padding:8px">${es.html}</div></td></tr>`;
+      es.bind(tbody);
+    } else {
+      tbody.innerHTML = list.map(p=>{
+        const c = KAT_COLORS[p.kategori] || {bg:'#F3F4F6',fg:'#374151',ic:'📦'};
+        return `<tr>
+          <td><div class="cn" style="font-family:monospace">${p.kode}</div></td>
+          <td><div class="cn">${p.nama}</div><div class="cs">${p.jenis}</div></td>
+          <td><span class="badge" style="background:${c.bg};color:${c.fg}">${c.ic} ${p.kategori}</span></td>
+          <td>${p.produsen}</td>
+          <td>${p.jumlah.toLocaleString('id-ID')} ${p.satuan}</td>
+          <td>${p.batch_date||'-'}</td>
+          <td><button class="btn btn-out btn-sm" data-trace="${p.id}" data-testid="btn-trace-${p.kode}">🔍 Telusuri</button></td>
+        </tr>`;
+      }).join('');
+    }
     tbody.querySelectorAll('[data-trace]').forEach(b=>{
       b.onclick = ()=> showTraceModal(b.dataset.trace);
     });
@@ -10787,7 +10919,16 @@ document.addEventListener('DOMContentLoaded',()=>{
             <button class="btn btn-red btn-sm" data-del="${u.id}" data-testid="del-${u.email}">🗑️</button>
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3)">Tidak ada user yang cocok</td></tr>';
+      }).join('') || (()=>{ const es = emptyState({
+        icon:'people',
+        title: (q||rf) ? 'Tidak ada user yang cocok' : 'Belum ada pengguna terdaftar',
+        subtitle: (q||rf) ? 'Ubah kata kunci atau reset filter role untuk melihat pengguna lainnya.' : 'Tambahkan pengguna baru dengan role sesuai (Lembaga Sertifikasi, Pekebun, PKS, Auditor, dll).',
+        cta: (q||rf) ? {label:'🔄 Reset Filter', onClick:()=>{
+          const s=document.getElementById('user-search'); const r=document.getElementById('user-role-filter');
+          if(s)s.value=''; if(r)r.value=''; renderTable();
+        }} : {label:'+ Tambah User Baru', onClick:()=> openNewUserModal(renderTable)}
+      }); window.__usersES = es; return `<tr><td colspan="7" style="padding:0"><div style="padding:8px">${es.html}</div></td></tr>`; })();
+      if (window.__usersES){ window.__usersES.bind(tbody); window.__usersES = null; }
 
       // Wire up role selectors
       tbody.querySelectorAll('.role-sel').forEach(sel => {
@@ -10917,7 +11058,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     catch(e){ document.getElementById('admin-list-tbody').innerHTML = `<tr><td colspan="${opts.cols.length}" style="text-align:center;padding:18px;color:var(--r)">❌ ${e.message}</td></tr>`; return; }
     const tb = document.getElementById('admin-list-tbody');
     if (!data.length) {
-      tb.innerHTML = `<tr><td colspan="${opts.cols.length}" style="text-align:center;padding:24px;color:var(--t3)">Belum ada data</td></tr>`;
+      const es = emptyState({
+        icon: opts.iconEmpty || 'box',
+        title: opts.titleEmpty || 'Belum ada data',
+        subtitle: opts.subtitleEmpty || 'Data akan muncul di sini saat tersedia.',
+      });
+      tb.innerHTML = `<tr><td colspan="${opts.cols.length}" style="padding:0"><div style="padding:8px">${es.html}</div></td></tr>`;
+      es.bind(tb);
       return;
     }
     tb.innerHTML = data.map(row => `<tr>${opts.cols.map(c => `<td>${c.render(row)}</td>`).join('')}</tr>`).join('');
@@ -10927,6 +11074,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     title: '🏆 Semua Sertifikat ISPO',
     subtitle: 'Daftar lengkap sertifikat ISPO yang telah diterbitkan di seluruh sistem.',
     api: '/certificates',
+    iconEmpty: 'cert',
+    titleEmpty: 'Belum ada sertifikat ISPO',
+    subtitleEmpty: 'Sertifikat yang diterbitkan oleh Lembaga Sertifikasi akan muncul di sini. Tambahkan data melalui menu penerbitan sertifikat.',
     cols: [
       {h:'Nomor', render:r=>`<span style="font-family:monospace;font-weight:600">${r.nomor}</span>`},
       {h:'Pemegang', render:r=>`<div class="cn">${r.pemegang}</div><div class="cs">${r.tipe}</div>`},
@@ -10942,6 +11092,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     title: '🔍 Semua Audit ISPO',
     subtitle: 'Pantau seluruh kegiatan audit ISPO yang sedang berjalan dan telah selesai.',
     api: '/audits',
+    iconEmpty: 'audit',
+    titleEmpty: 'Belum ada audit terjadwal',
+    subtitleEmpty: 'Audit yang dijadwalkan oleh Lembaga Sertifikasi akan muncul di sini. Jadwalkan audit awal, surveillance, atau re-certification.',
     cols: [
       {h:'Nomor', render:r=>`<span style="font-family:monospace;font-weight:600">${r.nomor}</span>`},
       {h:'Perusahaan', render:r=>r.perusahaan},
@@ -10957,6 +11110,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     title: '🏢 Semua Perusahaan',
     subtitle: 'Daftar perusahaan/koperasi/pekebun yang terdaftar di SI-ISPO.',
     api: '/companies',
+    iconEmpty: 'building',
+    titleEmpty: 'Belum ada perusahaan terdaftar',
+    subtitleEmpty: 'Perusahaan, koperasi, dan pekebun yang mendaftar melalui portal registrasi akan muncul di sini.',
     cols: [
       {h:'Nama', render:r=>`<div class="cn">${r.nama}</div>`},
       {h:'NPWP', render:r=>r.npwp||'-'},
@@ -11018,8 +11174,19 @@ document.addEventListener('DOMContentLoaded',()=>{
     let list = State.marketplaceItems||[];
     if (kat) list = list.filter(p => p.kategori===kat);
     if (!list.length){
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--t3)">Tidak ada produk di kategori ini</div>';
-      return;
+      const es = emptyState({
+        icon:'cart', title:'Tidak ada produk di kategori ini',
+        subtitle:'Coba pilih kategori lain atau reset filter untuk melihat semua produk di marketplace.',
+        cta:{label:'🔄 Reset Filter', onClick:()=>{
+          document.querySelectorAll('.mkt-kat-btn').forEach(x=>{x.classList.remove('btn-g');x.classList.add('btn-ghost')});
+          const first = document.querySelector('.mkt-kat-btn[data-k="Semua"]');
+          if (first) { first.classList.add('btn-g'); first.classList.remove('btn-ghost'); }
+          renderMktGrid(null);
+        }},
+        testid:'mkt-reset'
+      });
+      grid.innerHTML = `<div style="grid-column:1/-1">${es.html}</div>`;
+      es.bind(grid); return;
     }
     grid.innerHTML = list.map(p => {
       const c = KAT_COLORS[p.kategori]||{bg:'#F3F4F6',fg:'#374151',ic:'📦'};
@@ -11447,7 +11614,29 @@ document.addEventListener('DOMContentLoaded',()=>{
       if (s) list = list.filter(o => o.status === s);
       if (q) list = list.filter(o => (o.nomor+o.product_kode+o.product_nama+o.supplier+o.buyer_nama).toLowerCase().includes(q));
       const el = document.getElementById('orders-list');
-      if (!list.length){ el.innerHTML = '<div class="card" style="text-align:center;padding:30px;color:var(--t3)">Tidak ada pesanan</div>'; return; }
+      if (!list.length){
+        const isAdmin = (typeof cRole !== 'undefined') && cRole === 'superadmin';
+        const hasFilter = s || q;
+        const opts = hasFilter ? {
+          icon:'search', title:'Tidak ada pesanan yang cocok',
+          subtitle:'Coba reset filter atau ganti kata kunci pencarian.',
+          cta:{label:'🔄 Reset Filter', onClick:()=>{
+            const sf=document.getElementById('ord-status-filter'); const sq=document.getElementById('ord-search');
+            if(sf)sf.value=''; if(sq)sq.value=''; renderList();
+          }}
+        } : (isAdmin ? {
+          icon:'cart', title:'Belum ada pesanan di sistem',
+          subtitle:'Pesanan B2B dari buyer akan muncul di sini secara real-time.',
+        } : {
+          icon:'cart', title:'Belum ada pesanan',
+          subtitle:'Anda belum melakukan pemesanan. Kunjungi Marketplace ISPO untuk menemukan produk sawit bersertifikat.',
+          cta:{label:'🛒 Jelajahi Marketplace', onClick:()=> nav('marketplace')}
+        });
+        const es = emptyState(opts);
+        el.innerHTML = es.html;
+        es.bind(el);
+        return;
+      }
       el.innerHTML = list.map(o => {
         const sc = ORDER_STATUS_CLR[o.status] || {bg:'#F3F4F6',fg:'#374151',ic:'•'};
         const showBuyer = (typeof cRole !== 'undefined') && cRole === 'superadmin';

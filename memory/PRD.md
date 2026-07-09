@@ -184,3 +184,22 @@ Login page and every internal dashboard page (Dashboard, Marketplace, Pesanan Sa
 - **Login form**: 40px padding, single-column demo buttons with 13-16px padding, 50px Super Admin CTA, 14-18px form field spacing
 - **Grid layouts**: Force 20px gap on all `grid-template-columns` layouts
 - **Section rhythm**: 32px+ vertical space between major sections
+
+## Update — Content Max-Width + Empty States
+### Added
+- **Content max-width cap**: `#main-page` set to `max-width: 1440px; margin: 0 auto`. At 1600px+ viewports content is centered with additional side padding (60px vs 48px default). Prevents ugly stretching on ultra-wide monitors.
+- **Reusable `emptyState({icon, title, subtitle, cta, cta2, testid})` helper** with:
+  - Circular gradient background (soft green) with SVG illustration
+  - 9 built-in icon options: box, cart, search, plot, people, cert, doc, audit, building
+  - Big heading + subtitle + one or two CTA buttons (primary green + secondary outline)
+  - Hover lift effect on CTAs
+- **Empty state applied to**:
+  - Marketplace grid (no products in category) → "Reset Filter" CTA
+  - Produk & Traceability table (no products / no search match) → for suppliers: "+ Tambah Produk Baru", for viewers: "Reset Pencarian"
+  - Pemetaan Lahan sidebar list (no plots) → "✏️ Tambah Polygon di Peta" CTA
+  - Pesanan Saya / Admin Orders (no orders / no filter match) → for buyer: "🛒 Jelajahi Marketplace", for admin: info-only
+  - Admin Users (no users / no filter match) → "+ Tambah User Baru" or "Reset Filter"
+  - Admin Certificates/Audits/Companies → descriptive empty states with context
+
+### Visual pattern
+Every empty state uses the same design: 120px circle with soft green gradient (#F5F8F4 → #E7F3E4), 60px green SVG icon inside, 17px bold heading, 13.5px muted subtitle capped at 380px width, then 1-2 pill CTAs with green primary style.
