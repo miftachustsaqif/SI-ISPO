@@ -137,3 +137,18 @@ New features are **injected** into the existing mockup HTML via a single appende
 
 ### Flow Demonstration
 Buyer click order → see product detail with **complete chain**: e.g. "EcoWash Sabun Cuci Piring (DET-002) ← Methyl Laurate (ME-002) ← PKO Riau (PKO-RIA-001) ← TBS Riau A1 (TBS-RIA-001) ← Kebun Inti Riau A1 (1250.5 ha, Tersertifikasi ISPO sejak 2012)". Admin sees same chain plus the buyer who ordered.
+
+## Update — Clean Public Landing Page
+### Added
+- **New clean landing page** at `/landing.html` — replaces the previous login-first entry. Matches user's provided reference design.
+- **Sticky white navbar** with SI-ISPO brand, menu (Beranda/Cari Sertifikat/Berita/Regulasi/FAQ/Peta Sebaran), ID language selector, Login & Registrasi buttons.
+- **Split hero**: dark green background with palm oil plantation photo overlay + "Transparansi Sawit, Keberlanjutan untuk Indonesia" title + search bar + Login/Registrasi CTAs (left) — Statistik Terbuka card with 4 mini stat tiles (Sertifikat, Perusahaan, Luas Ha, Produksi) + donut chart (Sebaran Sertifikat Berdasarkan Jenis: Hulu/Hilir/Bioenergi) + mini Indonesia map (right).
+- **5 quick action cards**: Cari Sertifikat, Cari Perusahaan, Cari Produk, Peta Sebaran, Berita & Publikasi — each with color-coded icon.
+- **Content row**: Berita Terbaru list with news thumbnails + dates, big Leaflet map showing certified plots polygons, "Kenapa ISPO Penting?" dark green info card.
+- **Footer** with copyright, quick links (Tentang, Privasi, Syarat, Kontak), social icons (Facebook, Twitter, Instagram, YouTube).
+- **Fonts**: Plus Jakarta Sans (headings + body), JetBrains Mono (accents) — distinctive vs default Inter.
+- **All CTA buttons** deep-link to `/si-ispo.html` (the full app with login flow) so nothing is broken.
+- **Stats endpoint** now returns showcase baseline (893 certs, 726 companies, 7.8M ha) + any real DB additions on top.
+
+### React entry
+- `App.js` iframe now loads `/landing.html` by default (was `/si-ispo.html`).

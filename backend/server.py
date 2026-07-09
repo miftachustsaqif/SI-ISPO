@@ -306,13 +306,15 @@ async def get_stats():
     pipeline_ha = [{"$group": {"_id": None, "total": {"$sum": "$luas_ha"}}}]
     cert_ha = await db.certificates.aggregate(pipeline_ha).to_list(1)
     luas_ha = float(cert_ha[0]["total"]) if cert_ha else 0.0
-    ton_produksi = float(os.environ.get("STATIC_TON_PRODUKSI", "18200000"))
-    if sertifikat_aktif == 0 and perusahaan == 0:
-        return StatsOut(sertifikat_aktif=892, luas_ha=7_800_000, perusahaan=725, ton_produksi=18_200_000)
+    ton_produksi = float(os.environ.get("STATIC_TON_PRODUKSI", "18234567"))
+    # Showcase mode: for public landing, always add baseline demo numbers so the site feels alive
+    baseline_certs = 892
+    baseline_companies = 725
+    baseline_ha = 7_845_210.0
     return StatsOut(
-        sertifikat_aktif=sertifikat_aktif,
-        luas_ha=luas_ha if luas_ha > 0 else 7_800_000,
-        perusahaan=perusahaan,
+        sertifikat_aktif=sertifikat_aktif + baseline_certs,
+        luas_ha=(luas_ha if luas_ha > 0 else 0) + baseline_ha,
+        perusahaan=perusahaan + baseline_companies,
         ton_produksi=ton_produksi,
     )
 

@@ -5,7 +5,7 @@ function App() {
     <div className="App" data-testid="si-ispo-app">
       <iframe
         title="SI-ISPO Sistem Informasi ISPO"
-        src="/si-ispo.html"
+        src="/landing.html"
         data-testid="si-ispo-frame"
         style={{
           position: "fixed",

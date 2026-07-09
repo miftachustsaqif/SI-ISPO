@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SI-ISPO — Sistem Informasi ISPO</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --g:#1A5C1A;
+    --gd:#0E3B0E;
+    --gm:#16A34A;
+    --gl:#F5F8F4;
+    --gs:#E7F3E4;
+    --om:#D84900;
+    --t1:#0F1B15;
+    --t2:#3C4A42;
+    --t3:#6B7A72;
+    --bd:#E5E9E5;
+    --card:#FFFFFF;
+    --shadow: 0 1px 3px rgba(15,27,21,.06), 0 1px 2px rgba(15,27,21,.04);
+    --shadow-lg: 0 12px 32px rgba(15,27,21,.10), 0 4px 8px rgba(15,27,21,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#fff;color:var(--t1);font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%;display:block}
+  .wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+
+  /* ── Navbar ── */
+  .nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.95);backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--bd)}
+  .nav-inner{display:flex;align-items:center;gap:8px;padding:14px 0}
+  .brand{display:flex;align-items:center;gap:10px;padding-right:32px}
+  .brand-mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,var(--g),var(--gm));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;letter-spacing:.5px;box-shadow:var(--shadow)}
+  .brand-txt{display:flex;flex-direction:column;line-height:1.1}
+  .brand-txt b{font-size:15px;color:var(--t1);letter-spacing:-.3px}
+  .brand-txt small{font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.9px;margin-top:2px}
+  .nav-links{display:flex;align-items:center;gap:6px;flex:1}
+  .nav-link{padding:9px 14px;border-radius:8px;color:var(--t2);font-weight:500;font-size:14px;transition:all .15s;position:relative}
+  .nav-link:hover{background:var(--gl);color:var(--g)}
+  .nav-link.active{color:var(--g);font-weight:600}
+  .nav-link.active::after{content:"";position:absolute;left:14px;right:14px;bottom:2px;height:2px;border-radius:2px;background:var(--g)}
+  .lang-sel{display:flex;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--bd);border-radius:8px;font-size:13px;color:var(--t2);cursor:pointer;background:#fff}
+  .lang-sel:hover{border-color:var(--g)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:9px;font-weight:600;font-size:14px;cursor:pointer;border:none;transition:all .15s;text-decoration:none;font-family:inherit}
+  .btn-out{background:#fff;color:var(--g);border:1.5px solid var(--g)}
+  .btn-out:hover{background:var(--gs)}
+  .btn-p{background:var(--g);color:#fff;box-shadow:0 2px 8px rgba(26,92,26,.25)}
+  .btn-p:hover{background:var(--gd);box-shadow:0 4px 12px rgba(26,92,26,.35)}
+  .btn-ghost{background:transparent;color:var(--t2)}
+  .btn-ghost:hover{background:var(--gl);color:var(--g)}
+
+  /* ── Hero split ── */
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
+  .hero-left{
+    position:relative;
+    background:linear-gradient(135deg,#0E3B0E 0%,#1A5C1A 60%,#245F24 100%);
+    border-radius:16px;
+    padding:44px 40px 40px;
+    color:#fff;
+    overflow:hidden;
+    min-height:520px;
+    display:flex;flex-direction:column;justify-content:space-between;
+  }
+  .hero-left::before{
+    content:"";position:absolute;inset:0;
+    background:url("https://images.unsplash.com/photo-1591780980107-ec06d1023112?auto=format&fit=crop&w=1400&q=80") center/cover;
+    opacity:.25;
+    mix-blend-mode:overlay;
+  }
+  .hero-left::after{
+    content:"";position:absolute;inset:0;
+    background:radial-gradient(ellipse at bottom right, rgba(216,73,0,.28) 0%, transparent 60%);
+  }
+  .hero-left > *{position:relative;z-index:1}
+  .hero-title{font-size:44px;line-height:1.08;font-weight:800;letter-spacing:-1.2px}
+  .hero-title .hl{color:#67D989}
+  .hero-sub{margin-top:16px;font-size:15.5px;line-height:1.55;color:rgba(255,255,255,.85);max-width:460px}
+  .hero-search{margin-top:34px;display:flex;gap:10px;background:#fff;border-radius:12px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .hero-search input{flex:1;border:none;outline:none;padding:11px 14px;font-size:14px;background:transparent;font-family:inherit}
+  .hero-search .btn{padding:11px 22px}
+  .hero-cta{margin-top:16px;display:flex;gap:10px}
+  .hero-cta .btn{padding:11px 22px}
+  .btn-login-hero{background:rgba(255,255,255,.12);color:#fff;border:1.5px solid rgba(255,255,255,.35)}
+  .btn-login-hero:hover{background:rgba(255,255,255,.22)}
+  .btn-reg-hero{background:#fff;color:var(--g)}
+  .btn-reg-hero:hover{background:#F5F8F4}
+
+  /* ── Hero right (stats card) ── */
+  .hero-right{display:flex;flex-direction:column;gap:14px}
+  .stat-card-parent{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:22px;box-shadow:var(--shadow)}
+  .stat-head{display:flex;align-items:center;gap:6px;margin-bottom:16px}
+  .stat-head h3{font-size:14.5px;font-weight:700;color:var(--t1)}
+  .stat-head .info{width:16px;height:16px;border-radius:50%;background:var(--gl);color:var(--t3);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .mini-stat{padding:14px 12px;border-radius:10px;background:var(--gl);border:1px solid transparent;transition:all .15s}
+  .mini-stat:hover{border-color:var(--gs);background:#fff;box-shadow:var(--shadow)}
+  .mini-stat .icon-w{width:34px;height:34px;border-radius:9px;background:#fff;color:var(--g);display:flex;align-items:center;justify-content:center;margin-bottom:10px;font-size:16px}
+  .mini-stat .lbl{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:3px}
+  .mini-stat .val{font-size:22px;font-weight:800;color:var(--t1);letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .mini-stat .chg{font-size:11px;color:var(--gm);margin-top:5px;font-weight:600;display:flex;align-items:center;gap:3px}
+  .mini-stat .chg small{color:var(--t3);font-weight:400;margin-left:2px}
+
+  /* ── Sub cards row ── */
+  .sub-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sub-card{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .sub-card h4{font-size:13.5px;font-weight:700;color:var(--t1);margin-bottom:14px}
+  .donut-wrap{display:flex;align-items:center;gap:14px}
+  .donut-svg{width:110px;height:110px;flex-shrink:0}
+  .donut-legend{flex:1;display:flex;flex-direction:column;gap:9px}
+  .donut-item{display:flex;justify-content:space-between;align-items:center;font-size:12px}
+  .donut-item .dl{display:flex;align-items:center;gap:6px;color:var(--t2)}
+  .donut-item .dl .dot{width:9px;height:9px;border-radius:2px}
+  .donut-item .dv{color:var(--t1);font-weight:700;font-variant-numeric:tabular-nums}
+  .donut-item .dv small{color:var(--t3);font-weight:500;margin-left:2px}
+
+  .mini-map{position:relative;height:150px;border-radius:10px;overflow:hidden;background:#E8F0E8}
+  .mini-map .btn-mm{position:absolute;bottom:10px;right:10px;background:#fff;color:var(--g);padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;box-shadow:var(--shadow);border:1px solid var(--bd);cursor:pointer;text-decoration:none}
+  .mini-map .btn-mm:hover{background:var(--gs)}
+
+  /* ── Quick action row ── */
+  .qa-row{margin-top:20px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .qa-card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:18px 20px;display:flex;align-items:center;gap:14px;transition:all .18s;cursor:pointer;color:inherit}
+  .qa-card:hover{border-color:var(--gm);box-shadow:0 8px 20px rgba(22,163,74,.08);transform:translateY(-2px)}
+  .qa-icon{width:40px;height:40px;border-radius:10px;background:var(--gl);color:var(--g);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .qa-card:nth-child(2) .qa-icon{background:#EEF2FF;color:#4F46E5}
+  .qa-card:nth-child(3) .qa-icon{background:#FFF7ED;color:#C2410C}
+  .qa-card:nth-child(4) .qa-icon{background:#ECFEFF;color:#0891B2}
+  .qa-card:nth-child(5) .qa-icon{background:#FEF3F2;color:#DC2626}
+  .qa-text b{display:block;font-size:13.5px;color:var(--t1);font-weight:700;margin-bottom:2px}
+  .qa-text small{font-size:11.5px;color:var(--t3);line-height:1.35;display:block}
+
+  /* ── Content row ── */
+  .content-row{margin-top:22px;display:grid;grid-template-columns:1.1fr 1.4fr 1fr;gap:14px}
+  .panel{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .panel-head h3{font-size:15px;font-weight:700;color:var(--t1)}
+  .panel-head a{font-size:12.5px;color:var(--g);font-weight:600}
+  .news-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--bd)}
+  .news-item:last-child{border-bottom:none}
+  .news-img{width:60px;height:60px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,var(--gs),var(--gl));background-size:cover;background-position:center}
+  .news-body{flex:1;min-width:0}
+  .news-body b{display:block;font-size:13px;color:var(--t1);font-weight:700;line-height:1.35;margin-bottom:4px}
+  .news-body small{font-size:11px;color:var(--t3)}
+  .news-body .date{font-size:11px;color:var(--t3);margin-left:10px;white-space:nowrap;float:right}
+
+  .big-map{height:340px;border-radius:10px;overflow:hidden;position:relative}
+  .big-map .btn-mm{position:absolute;bottom:12px;right:12px}
+
+  .why-card{background:linear-gradient(135deg,#0E3B0E 0%,#1A5C1A 100%);color:#fff;border:none}
+  .why-card .why-icon{width:44px;height:44px;border-radius:11px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px}
+  .why-card h3{color:#fff;font-size:17px;font-weight:800;margin-bottom:10px;letter-spacing:-.2px}
+  .why-card p{font-size:13px;line-height:1.6;color:rgba(255,255,255,.85);margin-bottom:20px}
+  .why-card .btn{background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.35);padding:9px 18px;font-size:13px}
+  .why-card .btn:hover{background:rgba(255,255,255,.25)}
+
+  /* ── Footer ── */
+  footer{margin-top:40px;padding:24px 0;border-top:1px solid var(--bd)}
+  .foot-inner{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+  .foot-copy{font-size:12px;color:var(--t3)}
+  .foot-links{display:flex;gap:22px}
+  .foot-links a{font-size:12.5px;color:var(--t2);transition:color .15s}
+  .foot-links a:hover{color:var(--g)}
+  .foot-social{display:flex;gap:12px}
+  .foot-social a{width:32px;height:32px;border-radius:8px;background:var(--gl);display:flex;align-items:center;justify-content:center;color:var(--t2);transition:all .15s}
+  .foot-social a:hover{background:var(--g);color:#fff}
+  .foot-social svg{width:15px;height:15px}
+
+  @media (max-width: 1100px){
+    .hero{grid-template-columns:1fr}
+    .qa-row{grid-template-columns:repeat(3,1fr)}
+    .content-row{grid-template-columns:1fr}
+    .stats-grid{grid-template-columns:repeat(2,1fr)}
+    .hero-title{font-size:34px}
+    .nav-links{display:none}
+  }
+  @media (max-width: 640px){
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .qa-row{grid-template-columns:1fr}
+    .sub-cards{grid-template-columns:1fr}
+    .hero-left{padding:32px 24px}
+    .hero-title{font-size:28px}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/">
+      <div class="brand-mark">SI</div>
+      <div class="brand-txt">
+        <b>SI-ISPO</b>
+        <small>Sistem Informasi ISPO</small>
+      </div>
+    </a>
+    <div class="nav-links">
+      <a class="nav-link active">Beranda</a>
+      <a class="nav-link" href="/si-ispo.html">Cari Sertifikat</a>
+      <a class="nav-link" href="/si-ispo.html">Berita</a>
+      <a class="nav-link" href="/si-ispo.html">Regulasi</a>
+      <a class="nav-link" href="/si-ispo.html">FAQ</a>
+      <a class="nav-link" href="/si-ispo.html">Peta Sebaran</a>
+    </div>
+    <button class="lang-sel" data-testid="lang-sel">🌐 ID <span style="color:var(--t3)">▾</span></button>
+    <a class="btn btn-out" href="/si-ispo.html" data-testid="nav-login">Login</a>
+    <a class="btn btn-p" href="/si-ispo.html" data-testid="nav-registrasi">Registrasi</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div>
+      <h1 class="hero-title">Transparansi Sawit,<br><span class="hl">Keberlanjutan</span> untuk Indonesia</h1>
+      <p class="hero-sub">Akses informasi, profil, status sertifikat, dan traceability produk sawit Indonesia — semua dalam satu platform terbuka.</p>
+    </div>
+    <div>
+      <form class="hero-search" onsubmit="event.preventDefault();window.location='/si-ispo.html'">
+        <input type="text" placeholder="Cari sertifikat, perusahaan, produk..." data-testid="hero-search">
+        <button type="submit" class="btn btn-p">🔍 Cari</button>
+      </form>
+      <div class="hero-cta">
+        <a class="btn btn-login-hero" href="/si-ispo.html">👤 Login</a>
+        <a class="btn btn-reg-hero" href="/si-ispo.html">👤 Registrasi</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="stat-card-parent">
+      <div class="stat-head">
+        <h3>Statistik Terbuka</h3>
+        <span class="info" title="Data live dari SI-ISPO">i</span>
+      </div>
+      <div class="stats-grid" id="stats-grid">
+        <div class="mini-stat"><div class="icon-w">🏆</div><div class="lbl">Sertifikat Aktif</div><div class="val" id="s-cert">—</div><div class="chg">▲ 8.2% <small>vs bulan lalu</small></div></div>
+        <div class="mini-stat"><div class="icon-w">🏢</div><div class="lbl">Perusahaan Terdaftar</div><div class="val" id="s-comp">—</div><div class="chg">▲ 6.7% <small>vs bulan lalu</small></div></div>
+        <div class="mini-stat"><div class="icon-w">🌴</div><div class="lbl">Luas Lahan Tersertifikasi (ha)</div><div class="val" id="s-luas">—</div><div class="chg">▲ 5.4% <small>vs bulan lalu</small></div></div>
+        <div class="mini-stat"><div class="icon-w">🛢️</div><div class="lbl">Produksi Tersertifikasi (ton)</div><div class="val" id="s-prod">—</div><div class="chg">▲ 7.5% <small>vs bulan lalu</small></div></div>
+      </div>
+    </div>
+
+    <div class="sub-cards">
+      <div class="sub-card">
+        <h4>Sebaran Sertifikat Berdasarkan Jenis</h4>
+        <div class="donut-wrap">
+          <svg class="donut-svg" viewBox="0 0 42 42" id="donut">
+            <circle cx="21" cy="21" r="15.915" fill="#fff" stroke="var(--gl)" stroke-width="6"/>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#1E40AF" stroke-width="6" stroke-dasharray="56 44" stroke-dashoffset="25" transform="rotate(-90 21 21)"/>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#3730A3" stroke-width="6" stroke-dasharray="25 75" stroke-dashoffset="-31" transform="rotate(-90 21 21)"/>
+            <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#16A34A" stroke-width="6" stroke-dasharray="17 83" stroke-dashoffset="-56" transform="rotate(-90 21 21)"/>
+          </svg>
+          <div class="donut-legend">
+            <div class="donut-item"><span class="dl"><span class="dot" style="background:#1E40AF"></span> ISPO Hulu</span><span class="dv" id="d-hulu">56% <small>(506)</small></span></div>
+            <div class="donut-item"><span class="dl"><span class="dot" style="background:#3730A3"></span> ISPO Hilir (PKS)</span><span class="dv" id="d-hilir">25% <small>(223)</small></span></div>
+            <div class="donut-item"><span class="dl"><span class="dot" style="background:#16A34A"></span> ISPO Bioenergi</span><span class="dv" id="d-bio">17% <small>(151)</small></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="sub-card">
+        <h4>Peta Sebaran Tersertifikasi</h4>
+        <div class="mini-map" id="mini-map"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK ACTIONS -->
+<section class="qa-row">
+  <a class="qa-card" href="/si-ispo.html" data-testid="qa-cari-sertifikat">
+    <div class="qa-icon">🔍</div>
+    <div class="qa-text"><b>Cari Sertifikat</b><small>Cari dan verifikasi sertifikat ISPO</small></div>
+  </a>
+  <a class="qa-card" href="/si-ispo.html">
+    <div class="qa-icon">🏢</div>
+    <div class="qa-text"><b>Cari Perusahaan</b><small>Telusuri profil perusahaan sawit</small></div>
+  </a>
+  <a class="qa-card" href="/si-ispo.html">
+    <div class="qa-icon">🛒</div>
+    <div class="qa-text"><b>Cari Produk</b><small>Telusuri produk sawit bersertifikat ISPO</small></div>
+  </a>
+  <a class="qa-card" href="/si-ispo.html">
+    <div class="qa-icon">📍</div>
+    <div class="qa-text"><b>Peta Sebaran</b><small>Lihat sebaran kebun, PKS &amp; pabrik</small></div>
+  </a>
+  <a class="qa-card" href="/si-ispo.html">
+    <div class="qa-icon">📰</div>
+    <div class="qa-text"><b>Berita &amp; Publikasi</b><small>Informasi terbaru seputar ISPO dan sawit</small></div>
+  </a>
+</section>
+
+<!-- CONTENT ROW -->
+<section class="content-row">
+  <div class="panel">
+    <div class="panel-head"><h3>Berita Terbaru</h3><a href="/si-ispo.html">Lihat Semua →</a></div>
+    <div class="news-list">
+      <div class="news-item">
+        <div class="news-img" style="background-image:url('https://images.unsplash.com/photo-1584824388878-9edeae1f0dda?auto=format&fit=crop&w=200&q=60')"></div>
+        <div class="news-body">
+          <span class="date">10 Mei 2025</span>
+          <b>Pembaruan Regulasi ISPO 2025</b>
+          <small>Kementerian Pertanian</small>
+        </div>
+      </div>
+      <div class="news-item">
+        <div class="news-img" style="background-image:url('https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=200&q=60')"></div>
+        <div class="news-body">
+          <span class="date">8 Mei 2025</span>
+          <b>10 Perusahaan Raih Sertifikat ISPO</b>
+          <small>ISPO</small>
+        </div>
+      </div>
+      <div class="news-item">
+        <div class="news-img" style="background-image:url('https://images.unsplash.com/photo-1600353068867-5f3241d8f38a?auto=format&fit=crop&w=200&q=60')"></div>
+        <div class="news-body">
+          <span class="date">6 Mei 2025</span>
+          <b>Webinar: ISPO dan EUDR Compliance</b>
+          <small>ISPO</small>
+        </div>
+      </div>
+      <div class="news-item">
+        <div class="news-img" style="background-image:url('https://images.unsplash.com/photo-1571205300711-a5470cd47dfb?auto=format&fit=crop&w=200&q=60')"></div>
+        <div class="news-body">
+          <span class="date">3 Mei 2025</span>
+          <b>Pekebun Plasma Aceh Siap Sertifikasi</b>
+          <small>Kementerian Pertanian</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" style="padding:14px">
+    <div class="panel-head" style="padding:6px 6px 14px"><h3>Peta Sebaran Tersertifikasi</h3></div>
+    <div class="big-map" id="big-map">
+      <a class="btn-mm" href="/si-ispo.html">🗺️ Lihat Peta Lengkap</a>
+    </div>
+  </div>
+
+  <div class="panel why-card">
+    <div class="why-icon">🌿</div>
+    <h3>Kenapa ISPO Penting?</h3>
+    <p>ISPO memastikan pengelolaan kelapa sawit Indonesia dilakukan secara berkelanjutan, bertanggung jawab, dan mendukung kesejahteraan bagi masyarakat serta kelestarian lingkungan.</p>
+    <a class="btn" href="/si-ispo.html">Pelajari Lebih Lanjut →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-copy">© 2025 SI-ISPO — Sistem Informasi ISPO</div>
+    <div class="foot-links">
+      <a href="/si-ispo.html">Tentang Kami</a>
+      <a href="/si-ispo.html">Kebijakan Privasi</a>
+      <a href="/si-ispo.html">Syarat &amp; Ketentuan</a>
+      <a href="/si-ispo.html">Kontak</a>
+    </div>
+    <div class="foot-social">
+      <a href="#" aria-label="Facebook"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987H7.898V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.891h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg></a>
+      <a href="#" aria-label="Twitter"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+      <a href="#" aria-label="Instagram"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg></a>
+      <a href="#" aria-label="YouTube"><svg fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg></a>
+    </div>
+  </div>
+</footer>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(async function(){
+  // Load stats
+  const fmtNum = n => Number(n).toLocaleString('id-ID');
+  try{
+    const s = await (await fetch('/api/stats')).json();
+    document.getElementById('s-cert').textContent = fmtNum(s.sertifikat_aktif);
+    document.getElementById('s-comp').textContent = fmtNum(s.perusahaan);
+    document.getElementById('s-luas').textContent = fmtNum(s.luas_ha);
+    document.getElementById('s-prod').textContent = fmtNum(s.ton_produksi);
+  } catch(e){ console.log('stats load err', e); }
+
+  // Init mini + big map with plot polygons
+  const initMap = async (elId, opts) => {
+    const el = document.getElementById(elId);
+    if (!el || !window.L) return;
+    const map = L.map(el, {zoomControl: opts.zoom, attributionControl: false, dragging: opts.drag, scrollWheelZoom:false, doubleClickZoom:opts.drag, boxZoom:opts.drag, keyboard:opts.drag, tap:opts.drag}).setView([-2.0, 118.0], opts.z);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {maxZoom:18, subdomains:'abcd'}).addTo(map);
+    try{
+      const plots = await (await fetch('/api/plots')).json();
+      const group = L.featureGroup();
+      plots.forEach(p => {
+        if (!p.polygon || p.polygon.length < 3) return;
+        const color = p.status_ispo === 'Tersertifikasi' ? '#16A34A' : p.status_ispo === 'Proses' ? '#D97706' : '#9CA3AF';
+        L.polygon(p.polygon, {color, fillColor:color, fillOpacity:.5, weight:2}).addTo(group);
+      });
+      group.addTo(map);
+      if (opts.fit && plots.length){
+        const b = group.getBounds();
+        if (b.isValid()) map.fitBounds(b, {padding:[15,15]});
+      }
+    } catch(e){}
+  };
+  initMap('mini-map', {zoom:false, drag:false, z:4, fit:false});
+  initMap('big-map',  {zoom:true,  drag:true,  z:5, fit:true});
+})();
+</script>
+
+</body>
+</html>
