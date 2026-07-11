@@ -203,3 +203,13 @@ Login page and every internal dashboard page (Dashboard, Marketplace, Pesanan Sa
 
 ### Visual pattern
 Every empty state uses the same design: 120px circle with soft green gradient (#F5F8F4 → #E7F3E4), 60px green SVG icon inside, 17px bold heading, 13.5px muted subtitle capped at 380px width, then 1-2 pill CTAs with green primary style.
+
+## Update — Layout Refinement (Sidebar White + Content Fix)
+### Changes
+- **Sidebar redesigned**: Changed from full dark green gradient to white background with subtle border. Text is dark (#3C4A42 default, #0F1B15 on hover). Active item: soft green background (#E7F3E4) with 3px green left-accent bar. Icons: subtle green tint with .85 opacity default. Sidebar brand section and partner-logos strip: white with soft borders.
+- **Content padding rebalanced**: 28px vertical × 36px horizontal (was 40×48). Removed `max-width: 1440px; margin: 0 auto` — content now fills available width naturally (fixed awkward right-side whitespace).
+- **Cards proportional**: 22×24 padding (was 30×32), 12px radius (was 16px), 14px card title (was 15px)
+- **Stat cards**: 20×22 padding, 38px icons (was 44), 24px value font (was 30px), 10.5px uppercase labels
+- **Page header**: 22px h1 (was 30px), 22px bottom padding (was 32px)
+- **Topbar**: 14×32 padding, 60px min-height, solid white bg
+- **Responsive**: 32×48 padding at ≥1600px, 24×24 at ≤1200px
