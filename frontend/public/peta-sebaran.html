@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peta Sebaran ISPO — SI-ISPO</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/public-shell.css">
+<style>
+  .map-shell{display:grid;grid-template-columns:340px 1fr;gap:18px;margin-bottom:26px;align-items:stretch}
+  .side{background:#fff;border:1px solid var(--bd);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;max-height:640px}
+  .side-head{padding:16px 18px;border-bottom:1px solid var(--bd)}
+  .side-head h3{font-size:14px;font-weight:800;color:var(--t1);letter-spacing:-.2px;margin-bottom:2px}
+  .side-head small{font-size:11.5px;color:var(--t3)}
+  .side-list{flex:1;overflow-y:auto;padding:6px 0}
+  .prov-row{padding:12px 18px;border-bottom:1px solid #F1F4F1;cursor:pointer;transition:background .12s;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .prov-row:hover{background:var(--gl)}
+  .prov-row.on{background:var(--gs);border-left:3px solid var(--g);padding-left:15px}
+  .prov-row .pname{font-size:13px;font-weight:700;color:var(--t1);letter-spacing:-.1px}
+  .prov-row .pmeta{font-size:11px;color:var(--t3);margin-top:3px}
+  .prov-row .pcount{font-size:16px;font-weight:800;color:var(--g);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+  .prov-row .pcount small{display:block;font-size:9.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin-top:1px;text-align:right}
+
+  .map-wrap{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);position:relative;min-height:640px}
+  #big-map{width:100%;height:640px}
+  .legend{position:absolute;top:14px;right:14px;background:#fff;border:1px solid var(--bd);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow);font-size:12px;z-index:1000;min-width:180px}
+  .legend b{display:block;font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:700}
+  .legend .lg-item{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--t2)}
+  .legend .lg-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+
+  .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 8px}
+  .stat-strip .card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
+  .stat-strip .lbl{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  .stat-strip .val{font-size:24px;font-weight:800;color:var(--t1);letter-spacing:-.6px;font-variant-numeric:tabular-nums;margin-top:6px}
+  .stat-strip .sub{font-size:11.5px;color:var(--gm);font-weight:600;margin-top:3px}
+
+  /* Popup card */
+  .lp{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;min-width:220px}
+  .lp b{display:block;font-size:14px;font-weight:800;color:var(--t1);margin-bottom:6px}
+  .lp .row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--bd);color:var(--t2)}
+  .lp .row:last-child{border-bottom:none}
+  .lp .row span:last-child{font-weight:700;color:var(--t1)}
+  .lp .row.hi span:last-child{color:var(--gm)}
+
+  @media (max-width:900px){.map-shell{grid-template-columns:1fr}.side{max-height:340px}.stat-strip{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div id="nav-slot"></div>
+
+<div class="wrap">
+  <section class="page-hero">
+    <div class="crumb"><a href="/">Beranda</a><span class="sep">›</span><span>Peta Sebaran</span></div>
+    <h1 class="page-title">Peta Sebaran ISPO Indonesia</h1>
+    <p class="page-sub">Sebaran kebun, pekebun, dan lahan tersertifikasi ISPO di seluruh Indonesia. Klik provinsi untuk melihat detail jumlah pekebun.</p>
+  </section>
+
+  <div class="stat-strip" id="stat-strip"></div>
+
+  <div class="map-shell">
+    <aside class="side">
+      <div class="side-head">
+        <h3>Sebaran per Provinsi</h3>
+        <small>Klik provinsi untuk fokus di peta</small>
+      </div>
+      <div class="side-list" id="prov-list"></div>
+    </aside>
+    <div class="map-wrap">
+      <div id="big-map"></div>
+      <div class="legend">
+        <b>Status Sertifikasi</b>
+        <div class="lg-item"><span class="lg-dot" style="background:#16A34A"></span> Tersertifikasi</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#D97706"></span> Proses</div>
+        <div class="lg-item"><span class="lg-dot" style="background:#9CA3AF"></span> Belum</div>
+        <div class="lg-item" style="margin-top:8px;border-top:1px dashed var(--bd);padding-top:8px"><span class="lg-dot" style="background:linear-gradient(135deg,#1A5C1A,#16A34A);border:2px solid #fff;box-shadow:0 0 0 1px var(--bd)"></span> Pusat provinsi</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="footer-slot"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/public-shell.js"></script>
+<script>
+mountPublicShell('peta-sebaran');
+
+const fmt = n => Number(n||0).toLocaleString('id-ID');
+const fmtHa = n => Number(n||0).toLocaleString('id-ID',{maximumFractionDigits:0});
+
+let map, provMarkers = {}, plotLayer;
+
+async function initMap(){
+  map = L.map('big-map', {zoomControl:true, scrollWheelZoom:true}).setView([-2.0, 118.0], 5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {maxZoom:18, subdomains:'abcd'}).addTo(map);
+  // Live plot polygons (for realism)
+  try{
+    const plots = await (await fetch('/api/plots')).json();
+    plotLayer = L.featureGroup();
+    plots.forEach(p => {
+      if (!p.polygon || p.polygon.length < 3) return;
+      const color = p.status_ispo === 'Tersertifikasi' ? '#16A34A'
+                 : p.status_ispo === 'Proses'          ? '#D97706' : '#9CA3AF';
+      L.polygon(p.polygon, {color, fillColor:color, fillOpacity:.4, weight:2})
+        .bindPopup(`<div class="lp"><b>${p.nama}</b>
+          <div class="row"><span>Pemilik</span><span>${p.pemilik}</span></div>
+          <div class="row"><span>Provinsi</span><span>${p.provinsi}</span></div>
+          <div class="row"><span>Luas</span><span>${fmtHa(p.luas_ha)} ha</span></div>
+          <div class="row hi"><span>Status</span><span>${p.status_ispo}</span></div>
+        </div>`)
+        .addTo(plotLayer);
+    });
+    plotLayer.addTo(map);
+  } catch(e){}
+}
+
+function provIcon(count){
+  // scale circle by count
+  const size = Math.min(58, 26 + Math.round(Math.sqrt(count)/2));
+  const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#16A34A,#0E3B0E);color:#fff;font-weight:800;font-size:${size>=44?13:11}px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(14,59,14,.35);border:3px solid #fff;font-family:'Plus Jakarta Sans',sans-serif">${count}</div>`;
+  return L.divIcon({html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]});
+}
+
+function renderProvinces(rows){
+  // Stat strip totals
+  const totPek = rows.reduce((s,r)=>s+r.jumlah_pekebun,0);
+  const totCert = rows.reduce((s,r)=>s+r.tersertifikasi,0);
+  const totLuas = rows.reduce((s,r)=>s+r.total_luas_ha,0);
+  document.getElementById('stat-strip').innerHTML = `
+    <div class="card"><div class="lbl">Total Provinsi</div><div class="val">${rows.length}</div><div class="sub">tersebar di Indonesia</div></div>
+    <div class="card"><div class="lbl">Total Pekebun</div><div class="val">${fmt(totPek)}</div><div class="sub">▲ terdaftar di SI-ISPO</div></div>
+    <div class="card"><div class="lbl">Kebun Tersertifikasi</div><div class="val">${fmt(totCert)}</div><div class="sub">▲ lolos sertifikasi ISPO</div></div>
+    <div class="card"><div class="lbl">Total Luas Tersertifikasi</div><div class="val">${fmtHa(totLuas)}</div><div class="sub">hektar terpetakan</div></div>
+  `;
+
+  // Sidebar list
+  const list = document.getElementById('prov-list');
+  list.innerHTML = rows.map(r => `
+    <div class="prov-row" data-prov="${r.provinsi}" data-testid="prov-${r.provinsi.replace(/\s+/g,'-')}">
+      <div>
+        <div class="pname">${r.provinsi}</div>
+        <div class="pmeta">${fmt(r.tersertifikasi)} tersertifikasi · ${fmtHa(r.total_luas_ha)} ha</div>
+      </div>
+      <div class="pcount">${fmt(r.jumlah_pekebun)}<small>Pekebun</small></div>
+    </div>`).join('');
+  list.querySelectorAll('.prov-row').forEach(el => el.onclick = ()=>{
+    list.querySelectorAll('.prov-row').forEach(x=>x.classList.remove('on'));
+    el.classList.add('on');
+    const p = el.dataset.prov;
+    const row = rows.find(r=>r.provinsi===p);
+    if (row && row.lat != null){
+      map.flyTo([row.lat, row.lng], 7, {duration:1.1});
+      provMarkers[p] && provMarkers[p].openPopup();
+    }
+  });
+
+  // Map markers per province
+  rows.forEach(r => {
+    if (r.lat == null || r.lng == null) return;
+    const m = L.marker([r.lat, r.lng], {icon: provIcon(r.jumlah_pekebun)}).addTo(map);
+    m.bindPopup(`<div class="lp"><b>${r.provinsi}</b>
+      <div class="row"><span>Jumlah Pekebun</span><span>${fmt(r.jumlah_pekebun)}</span></div>
+      <div class="row"><span>Tersertifikasi</span><span>${fmt(r.tersertifikasi)}</span></div>
+      <div class="row"><span>Dalam Proses</span><span>${fmt(r.proses)}</span></div>
+      <div class="row"><span>Total Luas</span><span>${fmtHa(r.total_luas_ha)} ha</span></div>
+      <div class="row hi"><span>% Bersertifikat</span><span>${r.jumlah_pekebun?Math.round(r.tersertifikasi/r.jumlah_pekebun*100):0}%</span></div>
+    </div>`);
+    m.on('click', ()=>{
+      document.querySelectorAll('.prov-row').forEach(x=>{
+        x.classList.toggle('on', x.dataset.prov === r.provinsi);
+        if (x.dataset.prov === r.provinsi) x.scrollIntoView({block:'nearest',behavior:'smooth'});
+      });
+    });
+    provMarkers[r.provinsi] = m;
+  });
+}
+
+(async ()=>{
+  await initMap();
+  try{
+    const rows = await (await fetch('/api/province-stats')).json();
+    renderProvinces(rows);
+  } catch(e){
+    console.log('prov err', e);
+  }
+})();
+</script>
+</body>
+</html>

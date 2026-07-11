@@ -213,3 +213,58 @@ Every empty state uses the same design: 120px circle with soft green gradient (#
 - **Page header**: 22px h1 (was 30px), 22px bottom padding (was 32px)
 - **Topbar**: 14×32 padding, 60px min-height, solid white bg
 - **Responsive**: 32×48 padding at ≥1600px, 24×24 at ≤1200px
+
+## Update — SVG Nav Icons + Sidebar Collapse
+### Added
+- **SVG icon library** (25+ icons) replacing all emoji in sidebar nav — professional Lucide-style outlines. Icons include: dashboard, shield, users, map, link, cart, package, award, search, building, bell, settings, clipboard, tree, dollar, folder, chart, file, trade, factory, user, checkmark, lightning.
+- **Smart icon picker**: `pickIconForLabel(label, emoji)` matches nav labels against 20+ keyword patterns (dashboard/admin, user/role, pemetaan/peta/lahan, trace/produk, marketplace, pesanan, sertifikat, audit, perusahaan, notifikasi, setting, permohonan, laporan, dokumen, pembayaran, perkebun/tanam, bioenergi, review) plus fallback emoji→icon mapping. Any unrecognized falls back to a default help-circle.
+- **MutationObserver** on `#sb-nav` — re-runs icon replacement whenever nav DOM updates (role switch, dynamic nav additions).
+- **Sidebar collapse toggle**: small 24px circular button pinned at sidebar top-right edge with chevron icon (rotates 180° when collapsed).
+- **Collapsed state**: sidebar shrinks 244px → 68px, labels/brand-text/partner-logos hidden, nav items centered as icon-only, tooltip appears on hover (dark pill to the right).
+- **Persistence**: state saved to `localStorage.sb-collapsed` so it survives page reload.
+- **Sidebar CSS**: `overflow: visible` + `position: relative` on sidebar to allow toggle button to overflow neatly.
+
+
+## Update — 2026-02-11 · Public Multi-Page + Command Palette + Peta Sebaran
+### Added public pages (each with own dedicated route)
+- `/berita.html` — Berita & Publikasi ISPO with kategori chips + full-text search, 6 seed articles served by `GET /api/news`.
+- `/regulasi.html` — Regulasi & Kebijakan ISPO grouped by jenis (Permen/Perpres/UU/EUDR), 6 seed regulations from `GET /api/regulasi`.
+- `/faq.html` — 8 FAQ akordion + sidebar kontak Sekretariat ISPO, data dari `GET /api/faq`.
+- `/peta-sebaran.html` — Peta interaktif Leaflet dengan:
+  - Marker per provinsi (11 provinsi sawit Indonesia), ukuran proporsional dengan jumlah pekebun
+  - Sidebar daftar provinsi (klik untuk fly-to & popup detail)
+  - Popup detail: jumlah pekebun, tersertifikasi, dalam proses, total luas ha, % bersertifikat
+  - Data live dari `GET /api/province-stats` (aggregasi MongoDB `plots.provinsi` + baseline demo per provinsi)
+  - Polygon lahan real + legend status sertifikasi
+  - Stat strip: total provinsi / pekebun / tersertifikasi / luas
+- `/public-shell.css` + `/public-shell.js` — shared navbar/footer untuk semua halaman publik agar konsisten & mudah maintain.
+
+### Navbar refactor
+- Dihapus item "Cari Sertifikat" — pencarian sertifikat dijangkau dari hero landing.
+- 5 nav item aktif: Beranda, Berita, Regulasi, FAQ, Peta Sebaran (masing-masing punya halaman sendiri).
+- Aktif-state otomatis by page (garis bawah hijau di link aktif).
+
+### Command Palette (⌘K / Ctrl+K) & Topbar UX (dashboard `si-ispo.html`)
+- Global shortcut Cmd+K / Ctrl+K membuka modal search yang menampilkan:
+  - **Halaman** (dari role nav) • **Produk** • **Pesanan** • **Lahan** • **User** (super admin only)
+- Grouped result view, arrow-key nav, enter select, escape close.
+- Tombol "Cari cepat… ⌘K" ditambahkan ke topbar (data-testid `topbar-cmdk`).
+- **Breadcrumb topbar**: menampilkan hierarki `Data › Produk & Traceability` (dst.) berdasarkan `BREADCRUMB_MAP`. Update otomatis pada setiap `nav()` call.
+- **Persist last-active page** ke `localStorage.last-page-<role>` — reload restore ke halaman terakhir yang dibuka user (verified via screenshot test).
+
+### Backend endpoints baru
+- `GET /api/province-stats` — aggregasi MongoDB pipeline pada koleksi `plots` (group by provinsi: jumlah lahan/pekebun, luas total, tersertifikasi/proses/belum, centroid rata-rata) + baseline data 11 provinsi utama.
+- `GET /api/news` · `GET /api/regulasi` · `GET /api/faq` — static seed content untuk halaman publik.
+
+### App.js
+- Diubah dari `<iframe src="/landing.html">` menjadi `window.location.replace("/landing.html")` supaya top-level URL berubah saat navigasi antar public page (bukan hanya iframe internal).
+
+### Testing
+- Screenshot tool: verified landing, berita, regulasi, faq, peta-sebaran, si-ispo dashboard, Command Palette open + query "CPO", breadcrumb after nav, localStorage restore after reload → semua PASS.
+- Backend curl: `province-stats` returns 11 provinces (Riau top: 129 pekebun, 75 tersertifikasi), `news`/`regulasi`/`faq` return 6/6/8 items.
+
+### Backlog / Next
+- P1: Real JWT auth flow (currently mock demo-role buttons)
+- P2: PDF export untuk sertifikat & invoice pesanan
+- P3: In-app notifications untuk order baru (WebSocket)
+- P3: Refactor `si-ispo.html` monolitik jadi komponen React (opsional)

@@ -86,7 +86,65 @@
     background: #FFFFFF !important;
     border-right: 1px solid #EDEFED !important;
     box-shadow: none !important;
+    width: 244px !important;
+    min-width: 244px !important;
+    transition: width .22s ease, min-width .22s ease !important;
+    position: relative !important;
+    overflow: visible !important;
   }
+  .sb.sb-collapsed, #sb.sb-collapsed { width: 68px !important; min-width: 68px !important; }
+  .sb.sb-collapsed .nb-label,
+  .sb.sb-collapsed #sb-brand .brand-text,
+  .sb.sb-collapsed #sb-brand small,
+  .sb.sb-collapsed .partner-logos,
+  .sb.sb-collapsed .sb-logout .lbl { display: none !important; }
+  .sb.sb-collapsed .nb { justify-content: center !important; padding: 10px 0 !important; }
+  .sb.sb-collapsed .nb-icon { width: 24px !important; height: 24px !important; }
+  .sb.sb-collapsed #sb-brand { justify-content: center !important; padding: 18px 10px !important; }
+
+  /* Tooltip on collapsed */
+  .sb.sb-collapsed .nb:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    left: 100%; top: 50%;
+    transform: translateY(-50%);
+    margin-left: 10px;
+    background: #0F1B15;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    z-index: 200;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15);
+  }
+
+  /* Collapse toggle button */
+  .sb-toggle {
+    position: absolute !important;
+    top: 20px;
+    right: -12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid #EDEFED !important;
+    color: #3C4A42 !important;
+    box-shadow: 0 2px 6px rgba(15,27,21,.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 210;
+    transition: all .15s;
+    padding: 0 !important;
+  }
+  .sb-toggle:hover { background: #F5F7F5 !important; color: #1A5C1A !important; border-color: #1A5C1A !important; }
+  .sb-toggle svg { width: 13px; height: 13px; transition: transform .22s ease; }
+  .sb.sb-collapsed .sb-toggle svg { transform: rotate(180deg); }
+
   #sb-nav, .sb-nav { padding: 12px 12px !important; gap: 2px !important; }
   .nb {
     padding: 10px 12px !important;
@@ -94,7 +152,7 @@
     font-weight: 500 !important;
     font-size: 13.5px !important;
     color: #3C4A42 !important;
-    transition: all .15s !important;
+    transition: background .15s, color .15s !important;
     margin-bottom: 2px !important;
     gap: 12px !important;
     background: transparent !important;
@@ -104,6 +162,7 @@
     width: 100% !important;
     text-align: left !important;
     cursor: pointer !important;
+    position: relative !important;
   }
   .nb:hover { background: #F5F7F5 !important; color: #0F1B15 !important; }
   .nb.active {
@@ -121,10 +180,19 @@
     border-radius: 0 3px 3px 0;
     background: #1A5C1A;
   }
-  .nb { position: relative !important; }
-  .nb-label { font-size: 13px !important; color: inherit !important; }
-  .nb-icon, .nb > span:first-child { font-size: 16px !important; width: 20px !important; text-align: center; opacity: .85 }
-  .nb.active .nb-icon, .nb.active > span:first-child { opacity: 1 }
+  .nb-label { font-size: 13px !important; color: inherit !important; flex: 1; }
+  .nb-icon {
+    width: 20px !important;
+    height: 20px !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    color: #6B7A72;
+    flex-shrink: 0;
+  }
+  .nb-icon svg { width: 18px; height: 18px; stroke-width: 1.8; }
+  .nb.active .nb-icon { color: #1A5C1A; }
+  .nb:hover .nb-icon { color: #0F1B15; }
 
   /* Sidebar brand section — subtle divider */
   #sb-brand, .sb-brand {
@@ -11613,6 +11681,344 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
 
   /* ================================================================
+     COMMAND PALETTE (⌘K) — global search
+     ================================================================ */
+  const cmdKeyIcons = { produk:'cart', pesanan:'package', lahan:'plot', user:'people', page:'search' };
+
+  async function openCommandPalette(){
+    if (document.getElementById('cmdk-ov')) return;
+    // Preload data if not cached
+    if (!State.products || !State.products.length) { try{ await loadProducts(); }catch(e){} }
+    if (!State.plots || !State.plots.length)       { try{ await loadPlots(); }catch(e){} }
+    let orders = State.orders || [];
+    let users  = State.users  || [];
+    try { if (!orders.length) orders = State.orders = await api('/orders'); } catch(e){}
+    try { if (!users.length)  users  = State.users  = await api('/users'); } catch(e){}
+
+    const ov = document.createElement('div');
+    ov.id = 'cmdk-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,27,21,.5);backdrop-filter:blur(4px);z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh';
+    ov.innerHTML = `
+      <div style="background:#fff;border-radius:14px;max-width:640px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;font-family:'Plus Jakarta Sans',sans-serif" data-testid="cmdk-modal">
+        <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EDEFED">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7A72" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input id="cmdk-input" data-testid="cmdk-input" placeholder="Cari produk, pesanan, lahan, user, atau halaman..." style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;color:#0F1B15;padding:6px 0" autofocus>
+          <kbd style="background:#F5F7F5;color:#6B7A72;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;font-family:monospace">ESC</kbd>
+        </div>
+        <div id="cmdk-list" style="max-height:60vh;overflow-y:auto;padding:8px 0"></div>
+        <div style="padding:10px 18px;border-top:1px solid #EDEFED;background:#FAFBFA;font-size:11.5px;color:#6B7A72;display:flex;gap:14px">
+          <span><kbd style="background:#fff;border:1px solid #EDEFED;padding:1px 6px;border-radius:4px;font-size:10.5px;font-family:monospace">↑↓</kbd> Navigasi</span>
+          <span><kbd style="background:#fff;border:1px solid #EDEFED;padding:1px 6px;border-radius:4px;font-size:10.5px;font-family:monospace">↵</kbd> Pilih</span>
+          <span style="margin-left:auto">Ketik ke bawah untuk menyaring…</span>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const input = document.getElementById('cmdk-input');
+    const list  = document.getElementById('cmdk-list');
+    let items = [];    // current filtered items
+    let cursor = 0;
+
+    // Nav pages available (based on role)
+    const pages = [];
+    try {
+      (ROLES[cRole]?.nav || []).forEach(n => {
+        pages.push({ type:'page', id:n.id, title:n.label, subtitle:'Buka halaman', page:n.id });
+      });
+    } catch(e){}
+
+    function computeItems(q){
+      q = (q||'').toLowerCase().trim();
+      const match = (txt) => !q || (txt||'').toLowerCase().includes(q);
+      const rs = [];
+      // Pages
+      pages.filter(p => match(p.title)).slice(0, 6).forEach(p => rs.push(p));
+      // Products
+      (State.products||[]).filter(p => match(p.nama+p.kode+p.jenis+p.produsen)).slice(0, 8).forEach(p => {
+        rs.push({ type:'produk', id:p.id, title:p.nama, subtitle:`${p.kode} • ${p.kategori} • ${p.produsen}`, action:()=>{ State.prevPage=cPage; openProductDetail(p.id); } });
+      });
+      // Orders
+      orders.filter(o => match(o.nomor+o.product_nama+o.buyer_nama+o.supplier)).slice(0, 6).forEach(o => {
+        rs.push({ type:'pesanan', id:o.id, title:`${o.nomor} — ${o.product_nama}`, subtitle:`${o.buyer_nama} → ${o.supplier} • ${o.status}`, action:()=>{ State.prevPage=cPage; openProductDetail(o.product_id); } });
+      });
+      // Plots
+      (State.plots||[]).filter(p => match(p.nama+p.pemilik+p.provinsi)).slice(0, 5).forEach(p => {
+        rs.push({ type:'lahan', id:p.id, title:p.nama, subtitle:`${p.pemilik} • ${p.provinsi} • ${p.luas_ha} ha`, action:()=>{ nav('pemetaan-lahan'); setTimeout(()=>flyToPlot(p), 600); } });
+      });
+      // Users (only super admin)
+      if (cRole === 'superadmin'){
+        users.filter(u => match(u.nama+u.email+(u.org||''))).slice(0, 5).forEach(u => {
+          rs.push({ type:'user', id:u.id, title:u.nama, subtitle:`${u.email} • ${(ROLE_LABELS[u.role]?.label)||u.role}`, action:()=>{ nav('admin-users'); } });
+        });
+      }
+      return rs;
+    }
+
+    function render(){
+      if (!items.length){
+        list.innerHTML = '<div style="text-align:center;padding:36px;color:#6B7A72;font-size:13px">Tidak ada hasil</div>';
+        return;
+      }
+      const typeColors = {page:'#6B7A72',produk:'#3730A3',pesanan:'#1E40AF',lahan:'#16A34A',user:'#DC2626'};
+      const typeIc = {
+        page:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/></svg>',
+        produk:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+        pesanan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>',
+        lahan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/></svg>',
+        user:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/></svg>',
+      };
+      // Group by type
+      const groups = {};
+      items.forEach((it, idx) => {
+        (groups[it.type] = groups[it.type]||[]).push({...it, idx});
+      });
+      const groupNames = { page:'Halaman', produk:'Produk', pesanan:'Pesanan', lahan:'Lahan', user:'User' };
+      list.innerHTML = Object.keys(groups).map(gk => `
+        <div style="padding:6px 18px 4px;font-size:10.5px;color:#6B7A72;text-transform:uppercase;letter-spacing:.6px;font-weight:700">${groupNames[gk]||gk}</div>
+        ${groups[gk].map(it => `
+          <div class="cmdk-row" data-idx="${it.idx}" style="display:flex;align-items:center;gap:12px;padding:9px 18px;cursor:pointer;transition:background .1s;${it.idx===cursor?'background:#F5F7F5':''}">
+            <div style="width:28px;height:28px;border-radius:7px;background:${typeColors[gk]}18;color:${typeColors[gk]};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="14" height="14" style="display:block">${typeIc[gk]}</svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:#0F1B15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title}</div>
+              <div style="font-size:11.5px;color:#6B7A72;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px">${it.subtitle||''}</div>
+            </div>
+            ${it.idx===cursor?'<kbd style="background:#fff;border:1px solid #EDEFED;padding:2px 6px;border-radius:4px;font-size:10px;font-family:monospace;color:#6B7A72">↵</kbd>':''}
+          </div>`).join('')}
+      `).join('');
+      list.querySelectorAll('.cmdk-row').forEach(r => {
+        r.onmouseenter = ()=> { cursor = parseInt(r.dataset.idx); highlight(); };
+        r.onclick = ()=> select(parseInt(r.dataset.idx));
+      });
+    }
+    function highlight(){
+      list.querySelectorAll('.cmdk-row').forEach(r => {
+        r.style.background = parseInt(r.dataset.idx) === cursor ? '#F5F7F5' : '';
+      });
+      // scroll into view
+      const active = list.querySelector(`.cmdk-row[data-idx="${cursor}"]`);
+      if (active) active.scrollIntoView({block:'nearest'});
+    }
+    function select(idx){
+      const it = items[idx];
+      if (!it) return;
+      close();
+      if (it.action) it.action();
+      else if (it.type === 'page' && it.page) nav(it.page);
+    }
+    function close(){ ov.remove(); document.removeEventListener('keydown', keyHandler, true); }
+
+    function keyHandler(e){
+      if (e.key === 'Escape'){ e.preventDefault(); close(); }
+      else if (e.key === 'ArrowDown'){ e.preventDefault(); cursor = Math.min(cursor+1, items.length-1); highlight(); }
+      else if (e.key === 'ArrowUp'){ e.preventDefault(); cursor = Math.max(cursor-1, 0); highlight(); }
+      else if (e.key === 'Enter'){ e.preventDefault(); select(cursor); }
+    }
+    document.addEventListener('keydown', keyHandler, true);
+    ov.onclick = (e)=> { if (e.target === ov) close(); };
+    input.oninput = ()=> { items = computeItems(input.value); cursor = 0; render(); };
+    items = computeItems(''); render();
+    setTimeout(()=> input.focus(), 20);
+  }
+
+  // Global ⌘K / Ctrl+K
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')){
+      e.preventDefault();
+      if (typeof cRole !== 'undefined' && cRole) openCommandPalette();
+    }
+  });
+
+  /* ── Persist last active nav to localStorage + update breadcrumb ── */
+  const _origNav = window.nav;
+  if (typeof _origNav === 'function' && !window.__navPatched){
+    window.__navPatched = true;
+    window.nav = function(page){
+      try{ if (page && typeof cRole !== 'undefined' && cRole) localStorage.setItem('last-page-'+cRole, page); }catch(e){}
+      const r = _origNav(page);
+      // decorate topbar (idempotent) + refresh breadcrumb after render
+      setTimeout(()=>{ try{ decorateTopbar(); updateBreadcrumb(page); }catch(e){} }, 30);
+      return r;
+    };
+  }
+
+  /* Inject a small ⌘K button + breadcrumb into the topbar */
+  const BREADCRUMB_MAP = {
+    'dashboard': ['Dashboard'],
+    'admin-users': ['Admin', 'Manajemen User'],
+    'admin-orders': ['Admin', 'Semua Pesanan'],
+    'admin-certificates': ['Admin', 'Sertifikat'],
+    'admin-audits': ['Admin', 'Audit'],
+    'admin-companies': ['Admin', 'Perusahaan'],
+    'pemetaan-lahan': ['Data', 'Pemetaan Lahan'],
+    'produk-trace': ['Data', 'Produk & Traceability'],
+    'produk-detail': ['Produk', 'Detail Produk'],
+    'marketplace': ['Marketplace'],
+    'pesanan-saya': ['Marketplace', 'Pesanan Saya'],
+    'sertifikat': ['Sertifikat'],
+    'permohonan': ['Permohonan'],
+    'audit': ['Audit'],
+    'temuan': ['Audit', 'Temuan / NC'],
+    'perusahaan': ['Perusahaan'],
+    'pengaturan': ['Pengaturan'],
+    'notifikasi': ['Notifikasi'],
+    'laporan': ['Laporan'],
+    'profil': ['Profil'],
+  };
+
+  function updateBreadcrumb(pageId){
+    const bc = document.getElementById('tb-breadcrumb');
+    if (!bc) return;
+    const parts = BREADCRUMB_MAP[pageId];
+    if (!parts || parts.length < 2){ bc.innerHTML = ''; bc.style.display='none'; return; }
+    bc.style.display = 'inline-flex';
+    bc.innerHTML = parts.map((p,i)=>
+      i === parts.length-1
+        ? `<span style="color:#0F1B15;font-weight:700">${p}</span>`
+        : `<span style="color:#6B7A72">${p}</span><span style="color:#B8C0B8">›</span>`
+    ).join('');
+  }
+
+  function decorateTopbar(){
+    const tb = document.querySelector('#topbar, .topbar');
+    if (!tb || tb.querySelector('.tb-cmdk-btn')) return;
+
+    // breadcrumb container (inserted before title, above/next to it)
+    let bc = document.getElementById('tb-breadcrumb');
+    if (!bc){
+      bc = document.createElement('div');
+      bc.id = 'tb-breadcrumb';
+      bc.setAttribute('data-testid', 'topbar-breadcrumb');
+      bc.style.cssText = 'display:none;align-items:center;gap:6px;font-size:11.5px;color:#6B7A72;margin-right:14px';
+      const title = tb.querySelector('#tb-title');
+      if (title && title.parentNode) title.parentNode.insertBefore(bc, title);
+    }
+
+    // Insert command palette shortcut button
+    const btn = document.createElement('button');
+    btn.className = 'tb-cmdk-btn';
+    btn.setAttribute('data-testid', 'topbar-cmdk');
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;padding:6px 10px 6px 12px;background:#F5F7F5;border:1px solid #EDEFED;border-radius:8px;color:#6B7A72;font-size:12.5px;cursor:pointer;font-family:inherit;transition:all .15s;margin-left:auto';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>Cari cepat…</span>
+      <kbd style="background:#fff;border:1px solid #EDEFED;padding:1px 5px;border-radius:4px;font-size:10.5px;color:#6B7A72;font-family:monospace">⌘K</kbd>`;
+    btn.onmouseenter = ()=> { btn.style.background = '#EEF2EE'; btn.style.borderColor = '#D6E4D6'; };
+    btn.onmouseleave = ()=> { btn.style.background = '#F5F7F5'; btn.style.borderColor = '#EDEFED'; };
+    btn.onclick = openCommandPalette;
+    // insert after title if possible
+    const title = tb.querySelector('#tb-title');
+    if (title && title.parentNode) title.parentNode.insertBefore(btn, title.nextSibling);
+    else tb.appendChild(btn);
+  }
+
+  /* ================================================================
+     SVG ICONS FOR NAV (replaces emoji) + SIDEBAR COLLAPSE TOGGLE
+     ================================================================ */
+  const SVG_ICONS = {
+    'dashboard':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
+    'shield':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    'users':       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    'map':         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-6-3V4l6 3 6-3 6 3v13l-6-3-6 3z"/><line x1="9" y1="7" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="17"/></svg>',
+    'link':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+    'cart':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>',
+    'package':     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+    'award':       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>',
+    'search':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    'building':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="6" x2="9" y2="6"/><line x1="15" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="9" y2="10"/><line x1="15" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="9" y2="14"/><line x1="15" y1="14" x2="15" y2="14"/><path d="M9 22v-4h6v4"/></svg>',
+    'bell':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+    'settings':    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+    'clipboard':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
+    'tree':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-4 8c-1 1-2 2-2 4a5 5 0 0 0 5 5v3h2v-3a5 5 0 0 0 5-5c0-2-1-3-2-4a5 5 0 0 0-4-8z"/></svg>',
+    'dollar':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    'folder':      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+    'chart':       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    'file':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+    'trade':       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5"/><path d="M12 5v14"/><path d="M17 14l-5 5-5-5"/></svg>',
+    'factory':     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7H2z"/></svg>',
+    'user':        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    'checkmark':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    'lightning':   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    'default':     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  };
+
+  // Map emoji/label patterns → icon key
+  function pickIconForLabel(label, currentEmoji){
+    const t = (label || '').toLowerCase();
+    if (t.includes('dashboard') || t.includes('admin')) return 'dashboard';
+    if (t.includes('manajemen user') || t.includes('user') && t.includes('role')) return 'users';
+    if (t.includes('pemetaan') || t.includes('peta') || t.includes('lahan')) return 'map';
+    if (t.includes('traceability') || t.includes('produk & trace')) return 'link';
+    if (t.includes('marketplace')) return 'cart';
+    if (t.includes('pesanan')) return 'package';
+    if (t.includes('sertifikat')) return 'award';
+    if (t.includes('audit')) return 'search';
+    if (t.includes('perusahaan') || t.includes('pabrik')) return 'building';
+    if (t.includes('notifikasi')) return 'bell';
+    if (t.includes('pengaturan') || t.includes('setting')) return 'settings';
+    if (t.includes('permohonan')) return 'clipboard';
+    if (t.includes('dokumen')) return 'file';
+    if (t.includes('laporan')) return 'chart';
+    if (t.includes('pembayaran') || t.includes('billing') || t.includes('trade')) return 'dollar';
+    if (t.includes('perkebun') || t.includes('tanam') || t.includes('kebun')) return 'tree';
+    if (t.includes('profil')) return 'user';
+    if (t.includes('lembar') || t.includes('transaksi')) return 'trade';
+    if (t.includes('kapasitas') || t.includes('produksi') || t.includes('input')) return 'factory';
+    if (t.includes('bioenergi') || t.includes('energi')) return 'lightning';
+    if (t.includes('review')) return 'checkmark';
+    // fallback based on emoji character
+    if (currentEmoji){
+      const m = { '📊':'dashboard','🛡':'shield','👥':'users','🗺':'map','🔗':'link','🛒':'cart','📦':'package','🏆':'award','🔍':'search','🏢':'building','🔔':'bell','⚙':'settings','📋':'clipboard','📁':'folder','📂':'folder','📄':'file','📑':'file','📈':'chart','📊':'chart','💰':'dollar','💳':'dollar','🌴':'tree','🌿':'tree','👤':'user','✓':'checkmark','⚡':'lightning','🏭':'factory','📤':'trade','📥':'trade' };
+      for (const k in m){ if (currentEmoji.includes(k)) return m[k]; }
+    }
+    return 'default';
+  }
+
+  function replaceNavIcons(){
+    const nb = document.querySelectorAll('.nb');
+    nb.forEach(btn => {
+      // Save label to data-label for collapsed tooltip
+      const labelEl = btn.querySelector('.nb-label');
+      if (labelEl && !btn.dataset.label) btn.dataset.label = labelEl.textContent.trim();
+      // Find the emoji span (first child that isn't .nb-label)
+      const iconSpan = Array.from(btn.children).find(c => !c.classList || (!c.classList.contains('nb-label') && !c.classList.contains('nb-icon')));
+      if (iconSpan && !iconSpan.classList.contains('nb-icon')) {
+        const emoji = iconSpan.textContent.trim();
+        const key = pickIconForLabel(labelEl?.textContent, emoji);
+        iconSpan.className = 'nb-icon';
+        iconSpan.innerHTML = SVG_ICONS[key] || SVG_ICONS.default;
+      }
+    });
+  }
+
+  function initSidebarToggle(){
+    const sb = document.querySelector('.sb, #sb');
+    if (!sb || sb.querySelector('.sb-toggle')) return;
+    const btn = document.createElement('button');
+    btn.className = 'sb-toggle';
+    btn.setAttribute('data-testid', 'sidebar-toggle');
+    btn.setAttribute('aria-label', 'Toggle sidebar');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+    sb.appendChild(btn);
+    const saved = localStorage.getItem('sb-collapsed') === '1';
+    if (saved) sb.classList.add('sb-collapsed');
+    btn.onclick = ()=>{
+      sb.classList.toggle('sb-collapsed');
+      localStorage.setItem('sb-collapsed', sb.classList.contains('sb-collapsed') ? '1' : '0');
+    };
+  }
+
+  function watchSidebarNav(){
+    const nav = document.querySelector('#sb-nav');
+    if (!nav) return;
+    replaceNavIcons();
+    const mo = new MutationObserver(() => {
+      // debounce microtask
+      queueMicrotask(replaceNavIcons);
+    });
+    mo.observe(nav, { childList: true, subtree: true });
+  }
+
+  /* ================================================================
      PESANAN — Order list for Buyer / Admin
      ================================================================ */
   const ORDER_STATUS_CLR = {
@@ -11802,6 +12208,37 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Prefetch data
     loadPlots().catch(()=>{});
     loadProducts().catch(()=>{});
+
+    // Wait for app shell (sidebar) to exist, then wire icon replacement + collapse toggle + topbar decoration
+    const setupSidebar = () => {
+      const sb = document.querySelector('.sb, #sb');
+      const nav = document.querySelector('#sb-nav');
+      const tb = document.querySelector('#topbar, .topbar');
+      if (sb && nav) {
+        initSidebarToggle();
+        watchSidebarNav();
+        if (tb) {
+          decorateTopbar();
+          // Restore last active page for this role
+          try{
+            if (typeof cRole !== 'undefined' && cRole){
+              const last = localStorage.getItem('last-page-'+cRole);
+              if (last && typeof nav === 'function') { /* handled below */ }
+              if (last && typeof window.nav === 'function') {
+                setTimeout(()=> window.nav(last), 80);
+              } else if (last) {
+                setTimeout(()=> updateBreadcrumb(last), 100);
+              } else {
+                setTimeout(()=> updateBreadcrumb('dashboard'), 100);
+              }
+            }
+          }catch(e){}
+        }
+      } else {
+        setTimeout(setupSidebar, 300);
+      }
+    };
+    setupSidebar();
 
     // PUBLIC TRACE MODE: if URL has ?trace=<productId>, bypass login & show product detail
     const params = new URLSearchParams(location.search);

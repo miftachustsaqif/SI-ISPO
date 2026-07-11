@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Berita & Publikasi — SI-ISPO</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/public-shell.css">
+<style>
+  .filter-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 22px}
+  .chip{padding:7px 14px;border:1px solid var(--bd);border-radius:999px;font-size:12.5px;color:var(--t2);background:#fff;cursor:pointer;transition:all .15s;font-family:inherit}
+  .chip:hover{border-color:var(--g);color:var(--g)}
+  .chip.on{background:var(--g);color:#fff;border-color:var(--g)}
+  .search-inp{flex:1;min-width:240px;max-width:360px;padding:9px 14px;border:1px solid var(--bd);border-radius:9px;font-size:13.5px;font-family:inherit;outline:none;background:#fff}
+  .search-inp:focus{border-color:var(--g)}
+
+  .news-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .news-card{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);transition:all .2s;display:flex;flex-direction:column}
+  .news-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:var(--gm)}
+  .news-cover{width:100%;height:170px;background-size:cover;background-position:center;background-color:var(--gl)}
+  .news-body{padding:16px 18px 18px;display:flex;flex-direction:column;flex:1}
+  .news-meta{display:flex;gap:10px;align-items:center;font-size:11px;color:var(--t3);margin-bottom:8px}
+  .news-tag{background:var(--gs);color:var(--g);padding:2px 8px;border-radius:5px;font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+  .news-title{font-size:15px;font-weight:700;color:var(--t1);line-height:1.35;letter-spacing:-.2px;margin-bottom:8px}
+  .news-desc{font-size:13px;color:var(--t2);line-height:1.55;flex:1}
+  .news-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:11.5px;color:var(--t3)}
+  .news-foot a{color:var(--g);font-weight:700}
+  .empty{padding:60px 20px;text-align:center;color:var(--t3);grid-column:1/-1}
+  @media (max-width:900px){.news-grid{grid-template-columns:1fr 1fr}}
+  @media (max-width:600px){.news-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="nav-slot"></div>
+
+<div class="wrap">
+  <section class="page-hero">
+    <div class="crumb">
+      <a href="/">Beranda</a><span class="sep">›</span><span>Berita</span>
+    </div>
+    <h1 class="page-title">Berita &amp; Publikasi ISPO</h1>
+    <p class="page-sub">Kabar terbaru, regulasi, dan liputan tentang perkembangan sertifikasi sawit berkelanjutan di Indonesia.</p>
+  </section>
+
+  <div class="filter-row">
+    <input class="search-inp" id="q" placeholder="Cari berita, sumber, atau kata kunci…" data-testid="berita-search">
+    <div id="chips" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+
+  <div class="news-grid" id="grid"></div>
+</div>
+
+<div id="footer-slot"></div>
+
+<script src="/public-shell.js"></script>
+<script>
+mountPublicShell('berita');
+
+const grid  = document.getElementById('grid');
+const chips = document.getElementById('chips');
+const qInp  = document.getElementById('q');
+let all = [], activeCat = 'Semua', q = '';
+
+function renderChips(cats){
+  chips.innerHTML = ['Semua', ...cats].map(c =>
+    `<button class="chip ${c===activeCat?'on':''}" data-cat="${c}" data-testid="chip-${c}">${c}</button>`
+  ).join('');
+  chips.querySelectorAll('.chip').forEach(b => b.onclick = ()=>{
+    activeCat = b.dataset.cat; renderChips(cats); render();
+  });
+}
+function render(){
+  const rows = all.filter(n => (activeCat==='Semua' || n.kategori===activeCat)
+    && (!q || (n.judul+' '+n.ringkasan+' '+n.sumber).toLowerCase().includes(q.toLowerCase())));
+  if (!rows.length){
+    grid.innerHTML = '<div class="empty">Tidak ada berita yang cocok.</div>';
+    return;
+  }
+  grid.innerHTML = rows.map(n => `
+    <article class="news-card" data-testid="news-${n.id}">
+      <div class="news-cover" style="background-image:url('${n.gambar}')"></div>
+      <div class="news-body">
+        <div class="news-meta"><span class="news-tag">${n.kategori}</span><span>${n.tanggal}</span></div>
+        <h3 class="news-title">${n.judul}</h3>
+        <p class="news-desc">${n.ringkasan}</p>
+        <div class="news-foot"><span>${n.sumber}</span><a href="#" onclick="event.preventDefault()">Baca →</a></div>
+      </div>
+    </article>`).join('');
+}
+qInp.oninput = () => { q = qInp.value; render(); };
+
+(async ()=>{
+  try{
+    const r = await fetch('/api/news');
+    all = await r.json();
+    const cats = [...new Set(all.map(n=>n.kategori))];
+    renderChips(cats);
+    render();
+  } catch(e){
+    grid.innerHTML = '<div class="empty">Gagal memuat berita.</div>';
+  }
+})();
+</script>
+</body>
+</html>

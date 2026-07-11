@@ -386,6 +386,110 @@ async def create_audit(payload: AuditCreate):
     return obj
 
 
+# Province Stats — aggregasi jumlah pekebun & luas per provinsi (untuk peta sebaran publik)
+@api_router.get("/province-stats")
+async def province_stats():
+    pipeline = [
+        {"$group": {
+            "_id": "$provinsi",
+            "jumlah_lahan": {"$sum": 1},
+            "jumlah_pekebun": {"$addToSet": "$pemilik"},
+            "total_luas": {"$sum": "$luas_ha"},
+            "tersertifikasi": {"$sum": {"$cond": [{"$eq": ["$status_ispo", "Tersertifikasi"]}, 1, 0]}},
+            "proses": {"$sum": {"$cond": [{"$eq": ["$status_ispo", "Proses"]}, 1, 0]}},
+            "belum": {"$sum": {"$cond": [{"$eq": ["$status_ispo", "Belum Sertifikasi"]}, 1, 0]}},
+            "centroid_lat": {"$avg": {"$arrayElemAt": ["$centroid", 0]}},
+            "centroid_lng": {"$avg": {"$arrayElemAt": ["$centroid", 1]}},
+        }},
+    ]
+    rows = await db.plots.aggregate(pipeline).to_list(200)
+    # Baseline demo numbers per Indonesian palm oil province (agar peta terasa hidup untuk publik)
+    baseline = {
+        "Riau":              {"pekebun": 128, "luas": 1_845_320.0, "cert": 74, "lat": 0.5,  "lng": 101.5},
+        "Sumatera Utara":    {"pekebun": 96,  "luas": 1_213_780.0, "cert": 58, "lat": 3.0,  "lng": 99.0},
+        "Kalimantan Tengah": {"pekebun": 84,  "luas": 1_502_460.0, "cert": 47, "lat": -1.7, "lng": 113.4},
+        "Kalimantan Barat":  {"pekebun": 71,  "luas": 1_128_930.0, "cert": 39, "lat": 0.0,  "lng": 111.5},
+        "Kalimantan Timur":  {"pekebun": 55,  "luas": 812_540.0,   "cert": 31, "lat": 0.5,  "lng": 116.5},
+        "Jambi":             {"pekebun": 47,  "luas": 632_180.0,   "cert": 22, "lat": -1.6, "lng": 103.6},
+        "Sumatera Selatan":  {"pekebun": 62,  "luas": 923_450.0,   "cert": 28, "lat": -3.3, "lng": 103.9},
+        "Aceh":              {"pekebun": 38,  "luas": 421_670.0,   "cert": 16, "lat": 4.5,  "lng": 96.9},
+        "Bengkulu":          {"pekebun": 21,  "luas": 213_820.0,   "cert": 9,  "lat": -3.8, "lng": 102.3},
+        "Sulawesi Barat":    {"pekebun": 18,  "luas": 184_310.0,   "cert": 7,  "lat": -2.8, "lng": 118.9},
+        "Papua Barat":       {"pekebun": 14,  "luas": 156_820.0,   "cert": 5,  "lat": -1.3, "lng": 133.2},
+    }
+    # merge live aggregation
+    live_map = {r["_id"]: r for r in rows if r.get("_id")}
+    out = []
+    for prov, b in baseline.items():
+        live = live_map.get(prov, {})
+        out.append({
+            "provinsi": prov,
+            "jumlah_pekebun": b["pekebun"] + len(live.get("jumlah_pekebun", []) or []),
+            "jumlah_lahan":  b["pekebun"] + int(live.get("jumlah_lahan", 0) or 0),
+            "total_luas_ha": round(b["luas"] + float(live.get("total_luas", 0) or 0.0), 2),
+            "tersertifikasi": b["cert"] + int(live.get("tersertifikasi", 0) or 0),
+            "proses": int(live.get("proses", 0) or 0),
+            "belum":  int(live.get("belum", 0) or 0),
+            "lat": live.get("centroid_lat") if live.get("centroid_lat") is not None else b["lat"],
+            "lng": live.get("centroid_lng") if live.get("centroid_lng") is not None else b["lng"],
+        })
+    # extra provinces present in live data but not baseline
+    for prov, live in live_map.items():
+        if prov and prov not in baseline:
+            out.append({
+                "provinsi": prov,
+                "jumlah_pekebun": len(live.get("jumlah_pekebun", []) or []),
+                "jumlah_lahan":  int(live.get("jumlah_lahan", 0) or 0),
+                "total_luas_ha": round(float(live.get("total_luas", 0) or 0.0), 2),
+                "tersertifikasi": int(live.get("tersertifikasi", 0) or 0),
+                "proses": int(live.get("proses", 0) or 0),
+                "belum":  int(live.get("belum", 0) or 0),
+                "lat": live.get("centroid_lat"),
+                "lng": live.get("centroid_lng"),
+            })
+    out.sort(key=lambda x: x["jumlah_pekebun"], reverse=True)
+    return out
+
+
+# News / Regulasi / FAQ — static content untuk halaman publik
+@api_router.get("/news")
+async def public_news():
+    return [
+        {"id":"n1","tanggal":"10 Mei 2025","kategori":"Regulasi","sumber":"Kementerian Pertanian","judul":"Pembaruan Regulasi ISPO 2025","ringkasan":"Kementan resmi menerbitkan Permentan No. 15/2025 tentang penguatan sistem sertifikasi ISPO dan penyelarasan dengan EUDR.","gambar":"https://images.unsplash.com/photo-1584824388878-9edeae1f0dda?auto=format&fit=crop&w=800&q=70"},
+        {"id":"n2","tanggal":"8 Mei 2025","kategori":"Sertifikasi","sumber":"Sekretariat ISPO","judul":"10 Perusahaan Raih Sertifikat ISPO Baru","ringkasan":"Sepuluh perusahaan perkebunan sawit resmi menerima sertifikat ISPO setelah lolos audit tahap akhir.","gambar":"https://images.unsplash.com/photo-1509316785289-025f5b846b35?auto=format&fit=crop&w=800&q=70"},
+        {"id":"n3","tanggal":"6 Mei 2025","kategori":"Event","sumber":"Sekretariat ISPO","judul":"Webinar: ISPO dan EUDR Compliance","ringkasan":"Diskusi kesiapan pelaku sawit Indonesia menyongsong EUDR yang berlaku efektif akhir 2025.","gambar":"https://images.unsplash.com/photo-1600353068867-5f3241d8f38a?auto=format&fit=crop&w=800&q=70"},
+        {"id":"n4","tanggal":"3 Mei 2025","kategori":"Pekebun","sumber":"Kementerian Pertanian","judul":"Pekebun Plasma Aceh Siap Sertifikasi","ringkasan":"200+ pekebun plasma di Aceh Tamiang mulai proses pendampingan sertifikasi ISPO oleh Disbun.","gambar":"https://images.unsplash.com/photo-1571205300711-a5470cd47dfb?auto=format&fit=crop&w=800&q=70"},
+        {"id":"n5","tanggal":"29 April 2025","kategori":"Traceability","sumber":"BPDPKS","judul":"BPDPKS Dukung Digitalisasi Rantai Pasok","ringkasan":"BPDPKS menyalurkan dana untuk penguatan sistem traceability hulu-hilir kepada koperasi pekebun.","gambar":"https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=800&q=70"},
+        {"id":"n6","tanggal":"22 April 2025","kategori":"Riset","sumber":"IPB University","judul":"Riset Bioenergi Sawit Turunkan Emisi 32%","ringkasan":"Studi IPB menunjukkan biodiesel B40 sawit bersertifikat ISPO menurunkan emisi GRK signifikan.","gambar":"https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=800&q=70"},
+    ]
+
+
+@api_router.get("/regulasi")
+async def public_regulasi():
+    return [
+        {"id":"r1","nomor":"Permentan No. 15/2025","judul":"Sistem Sertifikasi Perkebunan Kelapa Sawit Berkelanjutan Indonesia","tahun":2025,"jenis":"Peraturan Menteri","ringkasan":"Penguatan mekanisme sertifikasi ISPO, keselarasan dengan EUDR, dan tata kelola pekebun swadaya.","file":"#"},
+        {"id":"r2","nomor":"Perpres No. 44/2020","judul":"Sistem Sertifikasi Perkebunan Kelapa Sawit Berkelanjutan Indonesia","tahun":2020,"jenis":"Peraturan Presiden","ringkasan":"Landasan hukum utama pelaksanaan ISPO wajib bagi seluruh pelaku usaha perkebunan sawit di Indonesia.","file":"#"},
+        {"id":"r3","nomor":"Permentan No. 38/2020","judul":"Penyelenggaraan Sertifikasi ISPO","tahun":2020,"jenis":"Peraturan Menteri","ringkasan":"Detail teknis penyelenggaraan sertifikasi ISPO, prinsip & kriteria, serta tugas lembaga sertifikasi.","file":"#"},
+        {"id":"r4","nomor":"UU No. 39/2014","judul":"Perkebunan","tahun":2014,"jenis":"Undang-Undang","ringkasan":"Pengaturan penyelenggaraan usaha perkebunan yang berkelanjutan di Indonesia.","file":"#"},
+        {"id":"r5","nomor":"Kepmentan No. 833/2019","judul":"Penetapan Luas Tutupan Kelapa Sawit Indonesia","tahun":2019,"jenis":"Keputusan Menteri","ringkasan":"Penetapan luas resmi tutupan lahan kelapa sawit sebagai basis kebijakan.","file":"#"},
+        {"id":"r6","nomor":"EUDR (EU) 2023/1115","judul":"EU Deforestation-Free Regulation","tahun":2023,"jenis":"Regulasi Internasional","ringkasan":"Regulasi Uni Eropa yang mensyaratkan bukti bebas deforestasi untuk komoditas termasuk sawit.","file":"#"},
+    ]
+
+
+@api_router.get("/faq")
+async def public_faq():
+    return [
+        {"q":"Apa itu ISPO?","a":"ISPO (Indonesian Sustainable Palm Oil) adalah sistem sertifikasi wajib bagi seluruh pelaku usaha perkebunan kelapa sawit di Indonesia untuk memastikan pengelolaan yang berkelanjutan secara ekonomi, sosial, dan lingkungan."},
+        {"q":"Siapa saja yang wajib bersertifikat ISPO?","a":"Perusahaan perkebunan, pekebun (swadaya maupun plasma), koperasi, serta pabrik kelapa sawit (PKS) yang mengelola tandan buah segar dari kebun tersertifikasi."},
+        {"q":"Berapa lama proses sertifikasi ISPO?","a":"Rata-rata 6–12 bulan tergantung kesiapan dokumen dan kondisi kebun. Prosesnya meliputi permohonan, audit dokumen, audit lapangan, review komisi, dan penerbitan sertifikat."},
+        {"q":"Bagaimana cara memverifikasi sertifikat ISPO?","a":"Anda dapat memasukkan nomor sertifikat atau nama perusahaan di halaman utama SI-ISPO, atau memindai QR code pada kemasan produk untuk melihat traceability lengkap."},
+        {"q":"Apa hubungan ISPO dengan EUDR?","a":"ISPO menjadi bukti compliance utama bagi eksportir sawit Indonesia untuk memenuhi persyaratan bebas deforestasi (EUDR) Uni Eropa mulai akhir 2025."},
+        {"q":"Apakah pekebun swadaya dikenakan biaya?","a":"Untuk pekebun swadaya, biaya sertifikasi sebagian didukung melalui BPDPKS dan pemerintah daerah. Pekebun bisa mengajukan melalui koperasi atau lembaga pendamping."},
+        {"q":"Bagaimana cara mengunduh sertifikat ISPO?","a":"Setelah login sebagai perusahaan pemilik, buka menu Sertifikat → klik sertifikat aktif → tekan tombol Unduh PDF."},
+        {"q":"Apa keuntungan bersertifikat ISPO?","a":"Akses pasar internasional, harga premium (green premium), reputasi bisnis, kepatuhan hukum, serta akses insentif dan pembiayaan hijau."},
+    ]
+
+
 # Plots
 @api_router.get("/plots", response_model=List[Plot])
 async def list_plots():

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FAQ — SI-ISPO</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/public-shell.css">
+<style>
+  .faq-wrap{display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start}
+  .faq-list{display:flex;flex-direction:column;gap:10px}
+  details.faq{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:14px 18px;transition:all .15s;box-shadow:var(--shadow)}
+  details.faq[open]{border-color:var(--gm);box-shadow:var(--shadow-lg)}
+  details.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:14px;font-size:14.5px;font-weight:700;color:var(--t1);letter-spacing:-.15px}
+  details.faq summary::-webkit-details-marker{display:none}
+  details.faq summary .arr{color:var(--g);font-size:18px;transition:transform .2s}
+  details.faq[open] summary .arr{transform:rotate(180deg)}
+  details.faq p{margin-top:12px;font-size:13.5px;color:var(--t2);line-height:1.6}
+  .search-inp{width:100%;padding:11px 14px;border:1px solid var(--bd);border-radius:9px;font-size:14px;font-family:inherit;outline:none;background:#fff;margin-bottom:16px}
+  .search-inp:focus{border-color:var(--g)}
+  .aside{position:sticky;top:80px}
+  .aside .panel{background:linear-gradient(135deg,#0E3B0E,#1A5C1A);color:#fff;border:none}
+  .aside .panel h3{color:#fff;font-size:16px;font-weight:800;margin-bottom:8px}
+  .aside .panel p{color:rgba(255,255,255,.85);font-size:13px;line-height:1.55;margin-bottom:16px}
+  .aside .btn{background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.35);padding:9px 16px;font-size:13px}
+  .aside .btn:hover{background:rgba(255,255,255,.25)}
+  .contact-card{margin-top:14px}
+  .contact-item{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--bd)}
+  .contact-item:last-child{border-bottom:none}
+  .contact-item .ic{width:36px;height:36px;border-radius:8px;background:var(--gl);color:var(--g);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+  .contact-item b{display:block;font-size:12.5px;color:var(--t1)}
+  .contact-item small{font-size:11.5px;color:var(--t3);line-height:1.4;display:block;margin-top:2px}
+  .empty{padding:60px 20px;text-align:center;color:var(--t3)}
+  @media (max-width:900px){.faq-wrap{grid-template-columns:1fr}.aside{position:static}}
+</style>
+</head>
+<body>
+
+<div id="nav-slot"></div>
+
+<div class="wrap">
+  <section class="page-hero">
+    <div class="crumb"><a href="/">Beranda</a><span class="sep">›</span><span>FAQ</span></div>
+    <h1 class="page-title">Pertanyaan yang Sering Diajukan</h1>
+    <p class="page-sub">Temukan jawaban ringkas tentang sertifikasi ISPO, traceability, dan kepatuhan EUDR untuk pelaku sawit Indonesia.</p>
+  </section>
+
+  <div class="faq-wrap">
+    <div>
+      <input class="search-inp" id="q" placeholder="Cari pertanyaan…" data-testid="faq-search">
+      <div class="faq-list" id="list"></div>
+    </div>
+    <aside class="aside">
+      <div class="panel">
+        <h3>Masih ada pertanyaan?</h3>
+        <p>Tim Sekretariat ISPO siap membantu Anda memahami proses sertifikasi dan traceability.</p>
+        <a class="btn" href="mailto:sekretariat@ispo-org.id" data-testid="faq-contact-btn">✉ Hubungi Kami</a>
+      </div>
+      <div class="panel contact-card" style="margin-top:14px">
+        <h3 style="font-size:14px;color:var(--t1);margin-bottom:10px">Kontak Cepat</h3>
+        <div class="contact-item"><div class="ic">✉</div><div><b>sekretariat@ispo-org.id</b><small>Email resmi Sekretariat ISPO</small></div></div>
+        <div class="contact-item"><div class="ic">☎</div><div><b>(021) 3900-2345</b><small>Senin–Jumat, 08.00–17.00 WIB</small></div></div>
+        <div class="contact-item"><div class="ic">📍</div><div><b>Kementerian Pertanian RI</b><small>Jl. Harsono RM No. 3, Ragunan, Jakarta Selatan</small></div></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div id="footer-slot"></div>
+
+<script src="/public-shell.js"></script>
+<script>
+mountPublicShell('faq');
+
+const list = document.getElementById('list');
+const qInp = document.getElementById('q');
+let all = [], q = '';
+function render(){
+  const rows = all.filter(f => !q || (f.q+' '+f.a).toLowerCase().includes(q.toLowerCase()));
+  if (!rows.length){ list.innerHTML = '<div class="empty">Pertanyaan tidak ditemukan.</div>'; return; }
+  list.innerHTML = rows.map((f,i) => `
+    <details class="faq" ${i===0&&!q?'open':''} data-testid="faq-item-${i}">
+      <summary><span>${f.q}</span><span class="arr">▾</span></summary>
+      <p>${f.a}</p>
+    </details>`).join('');
+}
+qInp.oninput = () => { q = qInp.value; render(); };
+(async ()=>{
+  try{ const r = await fetch('/api/faq'); all = await r.json(); render(); }
+  catch(e){ list.innerHTML = '<div class="empty">Gagal memuat FAQ.</div>'; }
+})();
+</script>
+</body>
+</html>

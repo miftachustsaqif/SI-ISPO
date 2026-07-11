@@ -1,24 +1,13 @@
 import "@/App.css";
+import { useEffect } from "react";
 
 function App() {
+  useEffect(() => {
+    // Redirect to the static landing page immediately
+    window.location.replace("/landing.html");
+  }, []);
   return (
-    <div className="App" data-testid="si-ispo-app">
-      <iframe
-        title="SI-ISPO Sistem Informasi ISPO"
-        src="/landing.html"
-        data-testid="si-ispo-frame"
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          width: "100vw",
-          height: "100vh",
-          border: "none",
-          margin: 0,
-          padding: 0,
-        }}
-      />
-    </div>
+    <div className="App" data-testid="si-ispo-app" style={{background:"#F5F8F4",minHeight:"100vh"}} />
   );
 }
 
