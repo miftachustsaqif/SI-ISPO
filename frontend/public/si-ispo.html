@@ -454,6 +454,60 @@
     box-shadow: 0 4px 10px rgba(26,92,26,.08) !important;
   }
   #login-form [data-role="superadmin"] {
+    /* legacy — replaced by .demo-btn styling */
+  }
+  .demo-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:6px;
+  }
+  .demo-btn{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 10px;
+    background:#fff;
+    color:#3C4A42;
+    border:1px solid #E5E9E5;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:600;
+    font-family:inherit;
+    text-align:left;
+    line-height:1.25;
+    cursor:pointer;
+    transition:all .15s;
+    min-width:0;
+    overflow:hidden;
+  }
+  .demo-btn:hover{background:#F5F7F5;border-color:#C9DFC9;color:#1A5C1A}
+  .demo-btn .di{flex:0 0 auto;font-size:14px;line-height:1;width:16px;text-align:center}
+  .demo-btn .dl{
+    flex:1 1 auto;
+    min-width:0;
+    white-space:normal;
+    overflow-wrap:break-word;
+    word-break:break-word;
+    hyphens:auto;
+  }
+  .demo-btn.demo-admin{
+    grid-column:1 / -1;
+    background:linear-gradient(135deg,#1A5C1A,#D84900);
+    color:#fff;
+    border-color:transparent;
+    padding:10px 12px;
+    font-weight:700;
+  }
+  .demo-btn.demo-admin:hover{filter:brightness(1.08);color:#fff}
+  .demo-btn.demo-kl{
+    grid-column:1 / -1;
+    background:linear-gradient(135deg,#1E40AF,#0891B2);
+    color:#fff;
+    border-color:transparent;
+    padding:10px 12px;
+    font-weight:700;
+  }
+  .demo-btn.demo-kl:hover{filter:brightness(1.08);color:#fff}
     background: linear-gradient(135deg,#1A5C1A,#D84900) !important;
     color: #fff !important;
     border: none !important;
@@ -1279,16 +1333,16 @@ textarea.inp{min-height:72px}
           <div style="text-align:center;margin-top:14px;font-size:12.5px;color:var(--t2)">Belum punya akun? <span style="color:var(--o);cursor:pointer;font-weight:700" onclick="goReg()">Daftar Sekarang</span></div>
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bd)">
             <div style="font-size:11px;color:var(--t3);text-align:center;margin-bottom:10px;font-weight:600">🚀 Demo Cepat — Pilih Peran</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('ls')">🏛️ Lembaga Sertifikasi</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('pekebun')">🌿 Pekebun</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('pks')">🏭 PKS / Hilir</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('buyer')">🛒 Buyer</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('auditor')">🔍 Auditor Eksternal</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('auditor_int')">🔎 Auditor Internal</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('reviewer')">📋 Reviewer LS</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('perkebunan')">🌴 Perusahaan Perkebunan</button>
-              <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:6px" onclick="loginAs('bioenergy')">⚡ Bioenergi</button>
+            <div class="demo-grid">
+              <button class="demo-btn" onclick="loginAs('ls')" data-testid="demo-ls"><span class="di">🏛️</span><span class="dl">Lembaga Sertifikasi</span></button>
+              <button class="demo-btn" onclick="loginAs('pekebun')" data-testid="demo-pekebun"><span class="di">🌿</span><span class="dl">Pekebun</span></button>
+              <button class="demo-btn" onclick="loginAs('pks')" data-testid="demo-pks"><span class="di">🏭</span><span class="dl">PKS / Hilir</span></button>
+              <button class="demo-btn" onclick="loginAs('buyer')" data-testid="demo-buyer"><span class="di">🛒</span><span class="dl">Buyer</span></button>
+              <button class="demo-btn" onclick="loginAs('auditor')" data-testid="demo-auditor"><span class="di">🔍</span><span class="dl">Auditor Eksternal</span></button>
+              <button class="demo-btn" onclick="loginAs('auditor_int')" data-testid="demo-auditor-int"><span class="di">🔎</span><span class="dl">Auditor Internal</span></button>
+              <button class="demo-btn" onclick="loginAs('reviewer')" data-testid="demo-reviewer"><span class="di">📋</span><span class="dl">Reviewer LS</span></button>
+              <button class="demo-btn" onclick="loginAs('perkebunan')" data-testid="demo-perkebunan"><span class="di">🌴</span><span class="dl">Perusahaan Perkebunan</span></button>
+              <button class="demo-btn" onclick="loginAs('bioenergy')" data-testid="demo-bioenergy"><span class="di">⚡</span><span class="dl">Bioenergi</span></button>
             </div>
             <button class="btn btn-om btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="openDemoPanel()">👤 Lihat Semua Akun Demo</button>
           </div>
@@ -10386,30 +10440,25 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   /* ── Inject Super Admin + K/L Maha Tahu demo login buttons ── */
   function injectAdminLoginBtn(){
-    const demoPanels = document.querySelectorAll('#login-form .btn.btn-om.btn-sm');
-    demoPanels.forEach(b => {
-      if (b.previousElementSibling && b.previousElementSibling.tagName === 'DIV') {
-        const grid = b.previousElementSibling;
-        if (!grid.querySelector('[data-role="superadmin"]')) {
-          const btn = document.createElement('button');
-          btn.className = 'btn btn-sm';
-          btn.setAttribute('data-role','superadmin');
-          btn.setAttribute('data-testid','demo-superadmin');
-          btn.style.cssText = 'justify-content:flex-start;gap:6px;background:linear-gradient(135deg,#1A5C1A,#D84900);color:#fff;border:none;grid-column:span 2';
-          btn.innerHTML = '🛡️ Super Admin (Lihat & Atur Semua)';
-          btn.onclick = ()=> loginAs('superadmin');
-          grid.appendChild(btn);
-        }
-        if (!grid.querySelector('[data-role="kl"]')) {
-          const btn = document.createElement('button');
-          btn.className = 'btn btn-sm';
-          btn.setAttribute('data-role','kl');
-          btn.setAttribute('data-testid','demo-kl');
-          btn.style.cssText = 'justify-content:flex-start;gap:6px;background:linear-gradient(135deg,#1E40AF,#0891B2);color:#fff;border:none;grid-column:span 2';
-          btn.innerHTML = '🏛️ K/L Maha Tahu (Kementerian/Lembaga · View Peta)';
-          btn.onclick = ()=> loginAs('kl');
-          grid.appendChild(btn);
-        }
+    const grids = document.querySelectorAll('.demo-grid');
+    grids.forEach(grid => {
+      if (!grid.querySelector('[data-role="superadmin"]')) {
+        const btn = document.createElement('button');
+        btn.className = 'demo-btn demo-admin';
+        btn.setAttribute('data-role','superadmin');
+        btn.setAttribute('data-testid','demo-superadmin');
+        btn.innerHTML = '<span class="di">🛡️</span><span class="dl">Super Admin — Lihat &amp; Atur Semua</span>';
+        btn.onclick = ()=> loginAs('superadmin');
+        grid.appendChild(btn);
+      }
+      if (!grid.querySelector('[data-role="kl"]')) {
+        const btn = document.createElement('button');
+        btn.className = 'demo-btn demo-kl';
+        btn.setAttribute('data-role','kl');
+        btn.setAttribute('data-testid','demo-kl');
+        btn.innerHTML = '<span class="di">🏛️</span><span class="dl">K/L Maha Tahu — Kementerian/Lembaga (View Peta)</span>';
+        btn.onclick = ()=> loginAs('kl');
+        grid.appendChild(btn);
       }
     });
   }
