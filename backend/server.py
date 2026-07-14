@@ -386,6 +386,47 @@ async def create_audit(payload: AuditCreate):
     return obj
 
 
+# Facilities — pabrik/PKS/refinery/bioenergy plants across Indonesia (untuk K/L dashboard pengawasan)
+@api_router.get("/facilities")
+async def public_facilities():
+    return [
+        # PKS (Pabrik Kelapa Sawit) — Sumatra
+        {"id":"pks1","tipe":"PKS","nama":"PKS Pelalawan","perusahaan":"PT Sawit Nusantara","provinsi":"Riau","lat":0.318,"lng":101.926,"kapasitas":"60 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0421/03/2024"},
+        {"id":"pks2","tipe":"PKS","nama":"PKS Duri","perusahaan":"PT Sawit Nusantara","provinsi":"Riau","lat":1.278,"lng":101.201,"kapasitas":"45 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0388/11/2023"},
+        {"id":"pks3","tipe":"PKS","nama":"PKS Labuhanbatu","perusahaan":"PT Palma Jaya","provinsi":"Sumatera Utara","lat":2.256,"lng":99.999,"kapasitas":"90 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0512/01/2025"},
+        {"id":"pks4","tipe":"PKS","nama":"PKS Muaro Jambi","perusahaan":"PT Industri Sawit Makmur","provinsi":"Jambi","lat":-1.552,"lng":103.588,"kapasitas":"75 ton TBS/jam","status":"Proses","sertifikat":None},
+        {"id":"pks5","tipe":"PKS","nama":"PKS Musi Banyuasin","perusahaan":"PT Bumi Sawit Sejahtera","provinsi":"Sumatera Selatan","lat":-2.891,"lng":103.891,"kapasitas":"60 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0501/12/2024"},
+        {"id":"pks6","tipe":"PKS","nama":"PKS Aceh Tamiang","perusahaan":"Koperasi Tani Aceh","provinsi":"Aceh","lat":4.279,"lng":97.965,"kapasitas":"30 ton TBS/jam","status":"Proses","sertifikat":None},
+        # PKS Kalimantan
+        {"id":"pks7","tipe":"PKS","nama":"PKS Ketapang","perusahaan":"PT Borneo Sawit Lestari","provinsi":"Kalimantan Barat","lat":-1.849,"lng":109.976,"kapasitas":"75 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0399/09/2023"},
+        {"id":"pks8","tipe":"PKS","nama":"PKS Sampit","perusahaan":"PT Borneo Sawit Lestari","provinsi":"Kalimantan Tengah","lat":-2.541,"lng":112.951,"kapasitas":"60 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0445/06/2024"},
+        {"id":"pks9","tipe":"PKS","nama":"PKS Kutai Timur","perusahaan":"PT Kaltim Palm Oil","provinsi":"Kalimantan Timur","lat":0.539,"lng":117.386,"kapasitas":"50 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0478/10/2024"},
+        # Sulawesi & Papua
+        {"id":"pks10","tipe":"PKS","nama":"PKS Mamuju","perusahaan":"PT Sulbar Sawit","provinsi":"Sulawesi Barat","lat":-2.678,"lng":118.891,"kapasitas":"40 ton TBS/jam","status":"Belum","sertifikat":None},
+        {"id":"pks11","tipe":"PKS","nama":"PKS Sorong","perusahaan":"PT Papua Palm","provinsi":"Papua Barat","lat":-0.877,"lng":131.267,"kapasitas":"35 ton TBS/jam","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0489/11/2024"},
+
+        # Refinery / Rafinasi
+        {"id":"ref1","tipe":"Refinery","nama":"Refinery Dumai","perusahaan":"PT Rafinasi Global","provinsi":"Riau","lat":1.664,"lng":101.442,"kapasitas":"3.000 ton CPO/hari","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0301/07/2023"},
+        {"id":"ref2","tipe":"Refinery","nama":"Refinery Belawan","perusahaan":"PT Minyak Sawit Indonesia","provinsi":"Sumatera Utara","lat":3.783,"lng":98.696,"kapasitas":"2.500 ton CPO/hari","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0328/09/2023"},
+        {"id":"ref3","tipe":"Refinery","nama":"Refinery Balikpapan","perusahaan":"PT Kaltim Refinery","provinsi":"Kalimantan Timur","lat":-1.244,"lng":116.881,"kapasitas":"2.000 ton CPO/hari","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0356/12/2023"},
+
+        # Bioenergy plants
+        {"id":"bio1","tipe":"Bioenergi","nama":"Pabrik Biodiesel Dumai","perusahaan":"PT Bioenergi Sawit Indonesia","provinsi":"Riau","lat":1.622,"lng":101.489,"kapasitas":"800.000 KL Biodiesel/tahun","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0611/02/2025"},
+        {"id":"bio2","tipe":"Bioenergi","nama":"Pabrik Biodiesel Cilegon","perusahaan":"PT Bioenergi Nusantara","provinsi":"Banten","lat":-6.019,"lng":106.041,"kapasitas":"500.000 KL Biodiesel/tahun","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0602/01/2025"},
+        {"id":"bio3","tipe":"Bioenergi","nama":"Biogas Sei Mangkei","perusahaan":"PT Green Energy Sawit","provinsi":"Sumatera Utara","lat":3.101,"lng":99.328,"kapasitas":"10 MW Biogas","status":"Proses","sertifikat":None},
+
+        # Oleokimia / Consumer product plants
+        {"id":"ole1","tipe":"Oleokimia","nama":"Pabrik Sabun & Kosmetik Bekasi","perusahaan":"PT Oleo Kimia Indonesia","provinsi":"Jawa Barat","lat":-6.238,"lng":106.995,"kapasitas":"120 ton/hari","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0578/08/2024"},
+        {"id":"ole2","tipe":"Oleokimia","nama":"Pabrik Margarin Surabaya","perusahaan":"PT Pangan Sehat Nusantara","provinsi":"Jawa Timur","lat":-7.279,"lng":112.797,"kapasitas":"200 ton/hari","status":"Tersertifikasi","sertifikat":"ISPO/SUC/0567/07/2024"},
+        {"id":"ole3","tipe":"Oleokimia","nama":"Pabrik Fatty Acid Gresik","perusahaan":"PT Oleo Kimia Indonesia","provinsi":"Jawa Timur","lat":-7.156,"lng":112.653,"kapasitas":"180 ton/hari","status":"Proses","sertifikat":None},
+
+        # LS (Lembaga Sertifikasi) offices
+        {"id":"ls1","tipe":"LS","nama":"LS SUCOFINDO Pusat","perusahaan":"PT Sucofindo (Persero)","provinsi":"DKI Jakarta","lat":-6.286,"lng":106.844,"kapasitas":"Audit ISPO Hulu, Hilir, Bioenergi","status":"Aktif","sertifikat":"KAN-LS-ISPO-001"},
+        {"id":"ls2","tipe":"LS","nama":"LS Mutu Agung Cabang Riau","perusahaan":"PT Mutuagung Lestari","provinsi":"Riau","lat":0.507,"lng":101.447,"kapasitas":"Audit ISPO Hulu, Hilir","status":"Aktif","sertifikat":"KAN-LS-ISPO-002"},
+        {"id":"ls3","tipe":"LS","nama":"LS TÜV Nord Cabang Medan","perusahaan":"TÜV Nord Indonesia","provinsi":"Sumatera Utara","lat":3.595,"lng":98.678,"kapasitas":"Audit ISPO Hulu","status":"Aktif","sertifikat":"KAN-LS-ISPO-003"},
+    ]
+
+
 # Province Stats — aggregasi jumlah pekebun & luas per provinsi (untuk peta sebaran publik)
 @api_router.get("/province-stats")
 async def province_stats():

@@ -10347,6 +10347,17 @@ document.addEventListener('DOMContentLoaded',()=>{
         ]
       };
     }
+    // Add the K/L "Maha Tahu" role — Kementerian/Lembaga pengawas (view-only mapping)
+    if (!ROLES.kl) {
+      ROLES.kl = {
+        name: 'K/L Maha Tahu',
+        role: 'Kementerian/Lembaga · Pengawas ISPO',
+        av: 'K',
+        nav: [
+          {id:'dashboard',    label:'Peta Pengawasan',    icon:'🗺️'},
+        ]
+      };
+    }
     const lahanItem = {id:'pemetaan-lahan', label:'Pemetaan Lahan', icon:'🗺️'};
     const traceItem = {id:'produk-trace',   label:'Produk & Traceability', icon:'🔗'};
     const mktItem   = {id:'marketplace',    label:'Marketplace ISPO', icon:'🛒'};
@@ -10373,7 +10384,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   }
 
-  /* ── Inject Super Admin demo login button ── */
+  /* ── Inject Super Admin + K/L Maha Tahu demo login buttons ── */
   function injectAdminLoginBtn(){
     const demoPanels = document.querySelectorAll('#login-form .btn.btn-om.btn-sm');
     demoPanels.forEach(b => {
@@ -10387,6 +10398,16 @@ document.addEventListener('DOMContentLoaded',()=>{
           btn.style.cssText = 'justify-content:flex-start;gap:6px;background:linear-gradient(135deg,#1A5C1A,#D84900);color:#fff;border:none;grid-column:span 2';
           btn.innerHTML = '🛡️ Super Admin (Lihat & Atur Semua)';
           btn.onclick = ()=> loginAs('superadmin');
+          grid.appendChild(btn);
+        }
+        if (!grid.querySelector('[data-role="kl"]')) {
+          const btn = document.createElement('button');
+          btn.className = 'btn btn-sm';
+          btn.setAttribute('data-role','kl');
+          btn.setAttribute('data-testid','demo-kl');
+          btn.style.cssText = 'justify-content:flex-start;gap:6px;background:linear-gradient(135deg,#1E40AF,#0891B2);color:#fff;border:none;grid-column:span 2';
+          btn.innerHTML = '🏛️ K/L Maha Tahu (Kementerian/Lembaga · View Peta)';
+          btn.onclick = ()=> loginAs('kl');
           grid.appendChild(btn);
         }
       }
@@ -10885,6 +10906,7 @@ document.addEventListener('DOMContentLoaded',()=>{
      ================================================================ */
   const ROLE_LABELS = {
     superadmin:{label:'Super Admin', ic:'🛡️', cls:'b-p'},
+    kl:{label:'K/L Maha Tahu', ic:'🏛️', cls:'b-b'},
     ls:{label:'Lembaga Sertifikasi', ic:'🏛️', cls:'b-b'},
     pekebun:{label:'Pekebun', ic:'🌿', cls:'b-g'},
     pks:{label:'PKS / Hilir', ic:'🏭', cls:'b-a'},
@@ -12160,6 +12182,226 @@ document.addEventListener('DOMContentLoaded',()=>{
     if (p) p.textContent = 'Lihat semua transaksi B2B lintas sistem. Klik order untuk telusuri rantai pasok dari produk yang dipesan sampai ke kebun asal TBS.';
   };
 
+  /* ================================================================
+     K/L MAHA TAHU — read-only pengawasan map (Kementerian/Lembaga)
+     ================================================================ */
+  window.rKLDashboard = async function(pg, tl){
+    tl.textContent = '🗺️ Peta Pengawasan Nasional';
+
+    // Ensure Leaflet is loaded
+    if (!window.L){
+      pg.innerHTML = '<div class="card" style="text-align:center;padding:40px">⚠️ Leaflet belum ter-load.</div>';
+      return;
+    }
+
+    // Fetch data in parallel
+    let plots = State.plots, provinces = [], facilities = [];
+    try{
+      const [pRes, fRes, prRes] = await Promise.all([
+        plots && plots.length ? Promise.resolve(plots) : api('/plots'),
+        api('/facilities'),
+        api('/province-stats'),
+      ]);
+      plots = pRes; facilities = fRes; provinces = prRes;
+      State.plots = plots;
+    } catch(e){
+      pg.innerHTML = '<div class="card" style="text-align:center;padding:40px">⚠️ Gagal memuat data: '+e.message+'</div>';
+      return;
+    }
+
+    // Totals
+    const totPlots = plots.length;
+    const plotCert = plots.filter(p=>p.status_ispo==='Tersertifikasi').length;
+    const plotProc = plots.filter(p=>p.status_ispo==='Proses').length;
+    const facCert  = facilities.filter(f=>f.status==='Tersertifikasi').length;
+    const totLuas  = plots.reduce((s,p)=>s+(p.luas_ha||0),0)
+                   + provinces.reduce((s,p)=>s+(p.total_luas_ha||0),0);
+    const fmt = n => Number(n||0).toLocaleString('id-ID');
+    const fmtHa = n => Number(n||0).toLocaleString('id-ID',{maximumFractionDigits:0});
+
+    pg.innerHTML = `
+      <div class="page-header">
+        <h1>🗺️ Peta Pengawasan Nasional ISPO</h1>
+        <p>Dashboard read-only untuk Kementerian/Lembaga — pantau sebaran kebun, industri pengolahan, dan fasilitas ISPO seluruh Indonesia dalam satu peta besar.</p>
+      </div>
+
+      <div class="stats-row" id="kl-stats"></div>
+
+      <div class="card" style="padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="kl-toggle">
+            <button class="kl-chip on" data-layer="kebun"      data-testid="kl-layer-kebun">🌴 Kebun (${fmt(totPlots)})</button>
+            <button class="kl-chip on" data-layer="pks"        data-testid="kl-layer-pks">🏭 PKS (${fmt(facilities.filter(f=>f.tipe==='PKS').length)})</button>
+            <button class="kl-chip on" data-layer="refinery"   data-testid="kl-layer-refinery">🛢️ Refinery (${fmt(facilities.filter(f=>f.tipe==='Refinery').length)})</button>
+            <button class="kl-chip on" data-layer="bioenergi"  data-testid="kl-layer-bioenergi">⚡ Bioenergi (${fmt(facilities.filter(f=>f.tipe==='Bioenergi').length)})</button>
+            <button class="kl-chip on" data-layer="oleokimia"  data-testid="kl-layer-oleokimia">🧪 Oleokimia (${fmt(facilities.filter(f=>f.tipe==='Oleokimia').length)})</button>
+            <button class="kl-chip on" data-layer="ls"         data-testid="kl-layer-ls">🏛️ Lembaga Sertifikasi (${fmt(facilities.filter(f=>f.tipe==='LS').length)})</button>
+            <button class="kl-chip on" data-layer="provinsi"   data-testid="kl-layer-provinsi">📍 Sebaran Provinsi (${fmt(provinces.length)})</button>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;font-size:11.5px;color:var(--t3);flex-wrap:wrap">
+            <span class="kl-lg"><span class="kl-dot" style="background:#16A34A"></span> Tersertifikasi</span>
+            <span class="kl-lg"><span class="kl-dot" style="background:#D97706"></span> Proses</span>
+            <span class="kl-lg"><span class="kl-dot" style="background:#9CA3AF"></span> Belum</span>
+          </div>
+        </div>
+        <div id="kl-map" style="width:100%;height:620px;border-radius:10px;overflow:hidden;border:1px solid var(--bd);background:#EAF2E8"></div>
+      </div>
+
+      <div class="g-21" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-title">🏆 Ringkasan Sertifikasi</div>
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--bd);text-align:left"><th style="padding:8px 0">Kategori</th><th style="text-align:right">Total</th><th style="text-align:right">Tersertifikasi</th><th style="text-align:right">%</th></tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px dashed var(--bd)"><td style="padding:9px 0">🌴 Kebun / Plot</td><td style="text-align:right">${fmt(totPlots)}</td><td style="text-align:right;color:var(--gm);font-weight:700">${fmt(plotCert)}</td><td style="text-align:right">${totPlots?Math.round(plotCert/totPlots*100):0}%</td></tr>
+              ${['PKS','Refinery','Bioenergi','Oleokimia','LS'].map(t => {
+                const tot = facilities.filter(f=>f.tipe===t).length;
+                const cert = facilities.filter(f=>f.tipe===t && (f.status==='Tersertifikasi'||f.status==='Aktif')).length;
+                const ic = {PKS:'🏭',Refinery:'🛢️',Bioenergi:'⚡',Oleokimia:'🧪',LS:'🏛️'}[t];
+                return `<tr style="border-bottom:1px dashed var(--bd)"><td style="padding:9px 0">${ic} ${t}</td><td style="text-align:right">${fmt(tot)}</td><td style="text-align:right;color:var(--gm);font-weight:700">${fmt(cert)}</td><td style="text-align:right">${tot?Math.round(cert/tot*100):0}%</td></tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">📍 Top 5 Provinsi (Jumlah Pekebun)</div>
+          ${provinces.slice(0,5).map((p,i)=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px dashed var(--bd)">
+              <div>
+                <div style="font-size:13px;font-weight:700">${i+1}. ${p.provinsi}</div>
+                <div style="font-size:11.5px;color:var(--t3);margin-top:2px">${fmt(p.tersertifikasi)} tersertifikasi · ${fmtHa(p.total_luas_ha)} ha</div>
+              </div>
+              <div style="font-size:18px;font-weight:800;color:var(--g);font-variant-numeric:tabular-nums">${fmt(p.jumlah_pekebun)}</div>
+            </div>`).join('')}
+          <button class="btn btn-out btn-sm" style="width:100%;justify-content:center;margin-top:12px" onclick="window.open('/peta-sebaran.html','_blank')">🌐 Buka Peta Sebaran Publik →</button>
+        </div>
+      </div>
+    `;
+
+    // Stat cards using existing sc() helper
+    document.getElementById('kl-stats').innerHTML =
+      sc('🌴','Total Kebun Terpetakan',fmt(totPlots),plotCert+' tersertifikasi','#E8F5E9','up') +
+      sc('🏭','Industri & Fasilitas',fmt(facilities.length),facCert+' tersertifikasi','#EEF3FF','up') +
+      sc('🌿','Total Luas Terpetakan',fmtHa(totLuas)+' ha','▲ agregat nasional','#CCFBF1','up') +
+      sc('📍','Provinsi Terpantau',fmt(provinces.length),'sebaran sawit','#FEF3C7','up');
+
+    // Toggle chip styles
+    const chipStyle = document.createElement('style');
+    chipStyle.textContent = `
+      .kl-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--bd);background:#fff;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;transition:all .12s;font-family:inherit}
+      .kl-chip:hover{border-color:var(--g)}
+      .kl-chip.on{background:var(--gs);color:var(--g);border-color:var(--g)}
+      .kl-chip.off{opacity:.45}
+      .kl-lg{display:inline-flex;align-items:center;gap:5px}
+      .kl-dot{width:10px;height:10px;border-radius:50%}
+      .kl-pop{font-family:'Plus Jakarta Sans',sans-serif;font-size:12.5px;min-width:230px}
+      .kl-pop b{display:block;font-size:14px;font-weight:800;color:#0F1B15;margin-bottom:6px}
+      .kl-pop .r{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #E5E9E5;color:#3C4A42}
+      .kl-pop .r:last-child{border-bottom:none}
+      .kl-pop .r span:last-child{font-weight:700;color:#0F1B15}
+      .kl-pop .badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:6px}
+    `;
+    pg.appendChild(chipStyle);
+
+    // Build map
+    setTimeout(()=>{
+      const mapEl = document.getElementById('kl-map');
+      if (!mapEl) return;
+      const map = L.map('kl-map', {zoomControl:true, scrollWheelZoom:true}).setView([-2.0,118.0], 5);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {maxZoom:18, subdomains:'abcd'}).addTo(map);
+
+      const statusColor = s => s==='Tersertifikasi'||s==='Aktif' ? '#16A34A' : s==='Proses' ? '#D97706' : '#9CA3AF';
+      const statusBadge = s => {
+        const c = statusColor(s);
+        return `<span class="badge" style="background:${c}18;color:${c}">${s||'—'}</span>`;
+      };
+
+      // ── Layer: kebun (plot polygons + centroid marker fallback) ──
+      const layerKebun = L.featureGroup();
+      plots.forEach(p => {
+        const clr = statusColor(p.status_ispo);
+        const popup = `<div class="kl-pop"><b>🌴 ${p.nama}</b>
+          <div class="r"><span>Pemilik</span><span>${p.pemilik||'—'}</span></div>
+          <div class="r"><span>Provinsi</span><span>${p.provinsi||'—'}</span></div>
+          ${p.kabupaten?`<div class="r"><span>Kabupaten</span><span>${p.kabupaten}</span></div>`:''}
+          <div class="r"><span>Luas</span><span>${fmtHa(p.luas_ha||0)} ha</span></div>
+          ${p.tahun_tanam?`<div class="r"><span>Tahun Tanam</span><span>${p.tahun_tanam}</span></div>`:''}
+          ${statusBadge(p.status_ispo)}
+        </div>`;
+        if (p.polygon && p.polygon.length >= 3){
+          L.polygon(p.polygon, {color:clr, fillColor:clr, fillOpacity:.45, weight:2}).bindPopup(popup).addTo(layerKebun);
+        } else if (p.centroid && p.centroid.length === 2){
+          L.circleMarker(p.centroid, {radius:6, color:clr, fillColor:clr, fillOpacity:.8, weight:2}).bindPopup(popup).addTo(layerKebun);
+        }
+      });
+
+      // ── Layer: provinsi bubble markers ──
+      const layerProv = L.featureGroup();
+      provinces.forEach(r => {
+        if (r.lat == null || r.lng == null) return;
+        const cnt = r.jumlah_pekebun || 0;
+        const size = Math.min(58, 26 + Math.round(Math.sqrt(cnt)/2));
+        const icon = L.divIcon({
+          html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#16A34A,#0E3B0E);color:#fff;font-weight:800;font-size:${size>=44?13:11}px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(14,59,14,.35);border:3px solid #fff;font-family:'Plus Jakarta Sans',sans-serif">${cnt}</div>`,
+          className:'', iconSize:[size,size], iconAnchor:[size/2,size/2]
+        });
+        L.marker([r.lat, r.lng], {icon}).bindPopup(`<div class="kl-pop"><b>📍 ${r.provinsi}</b>
+          <div class="r"><span>Jumlah Pekebun</span><span>${fmt(r.jumlah_pekebun)}</span></div>
+          <div class="r"><span>Tersertifikasi</span><span>${fmt(r.tersertifikasi)}</span></div>
+          <div class="r"><span>Dalam Proses</span><span>${fmt(r.proses)}</span></div>
+          <div class="r"><span>Total Luas</span><span>${fmtHa(r.total_luas_ha)} ha</span></div>
+          <div class="r"><span>% Bersertifikat</span><span style="color:var(--gm)">${r.jumlah_pekebun?Math.round(r.tersertifikasi/r.jumlah_pekebun*100):0}%</span></div>
+        </div>`).addTo(layerProv);
+      });
+
+      // ── Layer: facilities by tipe ──
+      const FAC_ICON = {
+        'PKS':      {emoji:'🏭', color:'#B45309'},
+        'Refinery': {emoji:'🛢️', color:'#0891B2'},
+        'Bioenergi':{emoji:'⚡', color:'#D97706'},
+        'Oleokimia':{emoji:'🧪', color:'#7C3AED'},
+        'LS':       {emoji:'🏛️', color:'#1E40AF'},
+      };
+      const facLayers = {PKS:L.featureGroup(), Refinery:L.featureGroup(), Bioenergi:L.featureGroup(), Oleokimia:L.featureGroup(), LS:L.featureGroup()};
+      facilities.forEach(f => {
+        const meta = FAC_ICON[f.tipe]; if (!meta) return;
+        const clr = statusColor(f.status);
+        const icon = L.divIcon({
+          html:`<div style="width:34px;height:34px;border-radius:9px;background:#fff;border:2.5px solid ${clr};box-shadow:0 3px 10px rgba(0,0,0,.18);display:flex;align-items:center;justify-content:center;font-size:15px">${meta.emoji}</div>`,
+          className:'', iconSize:[34,34], iconAnchor:[17,17]
+        });
+        L.marker([f.lat, f.lng], {icon}).bindPopup(`<div class="kl-pop"><b>${meta.emoji} ${f.nama}</b>
+          <div class="r"><span>Tipe</span><span>${f.tipe}</span></div>
+          <div class="r"><span>Perusahaan</span><span>${f.perusahaan}</span></div>
+          <div class="r"><span>Provinsi</span><span>${f.provinsi}</span></div>
+          <div class="r"><span>Kapasitas</span><span>${f.kapasitas}</span></div>
+          ${f.sertifikat?`<div class="r"><span>No. Sertifikat</span><span style="font-family:monospace;font-size:11px">${f.sertifikat}</span></div>`:''}
+          ${statusBadge(f.status)}
+        </div>`).addTo(facLayers[f.tipe]);
+      });
+
+      // Add all default-visible layers
+      layerKebun.addTo(map);
+      Object.values(facLayers).forEach(l => l.addTo(map));
+      layerProv.addTo(map);
+
+      // Fit bounds
+      const combined = L.featureGroup([layerKebun, layerProv, ...Object.values(facLayers)]);
+      const b = combined.getBounds(); if (b.isValid()) map.fitBounds(b, {padding:[30,30]});
+
+      // Toggle handler
+      const layerMap = {kebun: layerKebun, provinsi: layerProv, pks: facLayers.PKS, refinery: facLayers.Refinery, bioenergi: facLayers.Bioenergi, oleokimia: facLayers.Oleokimia, ls: facLayers.LS};
+      pg.querySelectorAll('.kl-chip').forEach(chip => chip.onclick = ()=>{
+        const key = chip.dataset.layer, layer = layerMap[key];
+        if (!layer) return;
+        const isOn = chip.classList.contains('on');
+        if (isOn){ chip.classList.remove('on'); chip.classList.add('off'); map.removeLayer(layer); }
+        else     { chip.classList.remove('off'); chip.classList.add('on'); layer.addTo(map); }
+      });
+    }, 60);
+  };
+
+
   function patchRenderPage(){
     if (typeof renderPage !== 'function') return;
     const original = renderPage;
@@ -12168,6 +12410,10 @@ document.addEventListener('DOMContentLoaded',()=>{
       // Super Admin sees a special dashboard
       if (page === 'dashboard' && (typeof cRole !== 'undefined') && cRole === 'superadmin'){
         return window.rAdminDashboard(pg, tl);
+      }
+      // K/L Maha Tahu — view-only pengawasan map
+      if (page === 'dashboard' && (typeof cRole !== 'undefined') && cRole === 'kl'){
+        return window.rKLDashboard(pg, tl);
       }
       if (page === 'pesanan-saya')       return window.rPesananSaya(pg, tl);
       if (page === 'admin-orders')       return window.rAdminOrders(pg, tl);

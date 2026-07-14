@@ -268,3 +268,23 @@ Every empty state uses the same design: 120px circle with soft green gradient (#
 - P2: PDF export untuk sertifikat & invoice pesanan
 - P3: In-app notifications untuk order baru (WebSocket)
 - P3: Refactor `si-ispo.html` monolitik jadi komponen React (opsional)
+
+
+## Update — 2026-02-14 · Role Baru: K/L Maha Tahu (Kementerian/Lembaga · Pengawas)
+### Added
+- **Role `kl`** — view-only dashboard untuk Kementerian/Lembaga pengawas ISPO.
+- **Sidebar**: hanya 1 menu — "Peta Pengawasan" (langsung buka big-map dashboard).
+- **Demo login button** "🏛️ K/L Maha Tahu" di login form (gradient biru-cyan, span 2 kolom, sebelah Super Admin).
+- **Dashboard `rKLDashboard`** — Leaflet map 620px berisi:
+  - 4 stat card: Total Kebun (dari `/api/plots`), Industri & Fasilitas (`/api/facilities`), Total Luas Terpetakan, Provinsi Terpantau.
+  - **Layer toggle chips**: Kebun / PKS / Refinery / Bioenergi / Oleokimia / Lembaga Sertifikasi / Sebaran Provinsi — klik untuk on/off tiap layer di peta.
+  - **Marker per fasilitas** dengan icon custom (emoji + border warna status) + popup detail (perusahaan, provinsi, kapasitas, no sertifikat).
+  - **Marker per provinsi** dengan bubble ukuran proporsional jumlah pekebun + popup detail (jumlah pekebun, tersertifikasi, luas ha, % bersertifikat).
+  - **Polygon plot** live dari MongoDB dengan popup detail (pemilik, luas, status ISPO).
+  - Legend "Tersertifikasi / Proses / Belum".
+  - Ringkasan tabel sertifikasi per kategori + Top 5 Provinsi.
+- **Backend endpoint `/api/facilities`** — 23 fasilitas hardcoded (11 PKS, 3 Refinery, 3 Bioenergi, 3 Oleokimia, 3 LS) tersebar di Riau, Sumut, Kalimantan, Sulawesi, Papua, Jawa. Setiap fasilitas punya lat/lng, kapasitas, status ISPO, no sertifikat.
+
+### Testing
+- Screenshot verified: K/L role login button muncul; setelah klik masuk ke dashboard Peta Pengawasan Nasional dengan 4 stat + big map + 23 facility marker + 11 province bubble; layer toggle PKS berfungsi (marker hilang saat off).
+- Backend curl `/api/facilities` returns 23 items dengan 5 tipe.
